@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "ZenlessTools (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "ZenlessTools (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}
