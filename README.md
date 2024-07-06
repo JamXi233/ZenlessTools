@@ -10,7 +10,7 @@
 🗃️多用户抽卡分析
 ![](https://cdn.jamsg.cn/release/ZenlessTools/3.webp)
 
-# 1.3安装方法
+# 安装方法
 打开Powershell
 
 输入irm zentools.jamsg.cn/get | iex
