@@ -314,7 +314,7 @@ namespace ZenlessTools
 
                 foreach (JsonElement game in games.EnumerateArray())
                 {
-                    if (game.GetProperty("biz").GetString() == "hkrpg_cn")
+                    if (game.GetProperty("biz").GetString() == "nap_cn")
                     {
                         backgroundUrl = game.GetProperty("display").GetProperty("background").GetProperty("url").GetString();
                         break;

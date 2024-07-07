@@ -69,8 +69,8 @@ namespace ZenlessTools.Views.GachaViews
             Logging.Write($"Total records found: {records.Count}", 0);
 
             // 筛选出四星和五星的记录
-            var rank4Records = records.Where(r => r.rankType == "4").ToList();
-            var rank5Records = records.Where(r => r.rankType == "3").ToList();
+            var rank4Records = records.Where(r => r.rankType == "3").ToList();
+            var rank5Records = records.Where(r => r.rankType == "4").ToList();
             Logging.Write($"4-star records count: {rank4Records.Count}, 5-star records count: {rank5Records.Count}", 0);
 
             // 按名称进行分组并计算每个分组中的记录数量
@@ -256,8 +256,8 @@ namespace ZenlessTools.Views.GachaViews
             var stackPanelBasicInfo = new StackPanel();
             stackPanelBasicInfo.Children.Add(new TextBlock { Text = $"UID: {gachaData.info.uid}", FontWeight = FontWeights.Bold });
             stackPanelBasicInfo.Children.Add(new TextBlock { Text = $"总计抽数: {selectedRecords.Count}" });
-            stackPanelBasicInfo.Children.Add(new TextBlock { Text = $"五星抽卡次数: {rank5Records.Count}" });
-            stackPanelBasicInfo.Children.Add(new TextBlock { Text = $"四星抽卡次数: {rank4Records.Count}" });
+            stackPanelBasicInfo.Children.Add(new TextBlock { Text = $"抽到S级次数: {rank5Records.Count}" });
+            stackPanelBasicInfo.Children.Add(new TextBlock { Text = $"抽到A级次数: {rank4Records.Count}" });
             stackPanelBasicInfo.Children.Add(new TextBlock { Text = $"预计使用菲林: {selectedRecords.Count * 160}" });
             basicInfoPanel.Child = stackPanelBasicInfo;
             contentPanel.Children.Add(basicInfoPanel);
@@ -266,31 +266,31 @@ namespace ZenlessTools.Views.GachaViews
             var stackPanelDetailInfo = new StackPanel();
             stackPanelDetailInfo.Children.Add(new TextBlock { Text = "详细统计", FontWeight = FontWeights.Bold });
 
-            stackPanelDetailInfo.Children.Add(new TextBlock { Text = $"五星平均抽数: {averageDraws5Star}抽" });
-            stackPanelDetailInfo.Children.Add(new TextBlock { Text = $"四星平均抽数: {averageDraws4Star}抽" });
+            stackPanelDetailInfo.Children.Add(new TextBlock { Text = $"S级平均抽数: {averageDraws5Star}抽" });
+            stackPanelDetailInfo.Children.Add(new TextBlock { Text = $"A级平均抽数: {averageDraws4Star}抽" });
 
             string rate4Star = rank4Records.Count > 0 ? (rank4Records.Count / (double)selectedRecords.Count * 100).ToString("F2") + "%" : "∞";
             string rate5Star = rank5Records.Count > 0 ? (rank5Records.Count / (double)selectedRecords.Count * 100).ToString("F2") + "%" : "∞";
 
-            stackPanelDetailInfo.Children.Add(new TextBlock { Text = $"五星获取率: {rate5Star}" });
-            stackPanelDetailInfo.Children.Add(new TextBlock { Text = $"四星获取率: {rate4Star}" });
+            stackPanelDetailInfo.Children.Add(new TextBlock { Text = $"S级获取率: {rate5Star}" });
+            stackPanelDetailInfo.Children.Add(new TextBlock { Text = $"A级获取率: {rate4Star}" });
 
             if (rank5Records.Any())
             {
-                stackPanelDetailInfo.Children.Add(new TextBlock { Text = $"最近五星: {rank5Records.First().time}" });
+                stackPanelDetailInfo.Children.Add(new TextBlock { Text = $"最近S级: {rank5Records.First().time}" });
             }
             else
             {
-                stackPanelDetailInfo.Children.Add(new TextBlock { Text = "最近五星: ∞" });
+                stackPanelDetailInfo.Children.Add(new TextBlock { Text = "最近S级: ∞" });
             }
 
             if (rank4Records.Any())
             {
-                stackPanelDetailInfo.Children.Add(new TextBlock { Text = $"最近四星: {rank4Records.First().time}" });
+                stackPanelDetailInfo.Children.Add(new TextBlock { Text = $"最近A级: {rank4Records.First().time}" });
             }
             else
             {
-                stackPanelDetailInfo.Children.Add(new TextBlock { Text = "最近四星: ∞" });
+                stackPanelDetailInfo.Children.Add(new TextBlock { Text = "最近A级: ∞" });
             }
 
             detailInfoPanel.Child = stackPanelDetailInfo;
@@ -299,7 +299,7 @@ namespace ZenlessTools.Views.GachaViews
             // 创建五星垫次数卡片
             var borderFiveStar = CreateDetailBorder();
             var stackPanelFiveStar = new StackPanel();
-            stackPanelFiveStar.Children.Add(new TextBlock { Text = $"距离上一个五星已经垫了{countSinceLast5Star}发", FontWeight = FontWeights.Bold });
+            stackPanelFiveStar.Children.Add(new TextBlock { Text = $"距离上一个S级已经垫了{countSinceLast5Star}发", FontWeight = FontWeights.Bold });
 
             var selectedCardPool = cardPoolInfo.CardPools.FirstOrDefault(cp => cp.CardPoolId == selectedCardPoolId);
             if (selectedCardPool != null && selectedCardPool.FiveStarPity.HasValue)
@@ -314,7 +314,7 @@ namespace ZenlessTools.Views.GachaViews
             // 创建四星垫次数卡片
             var borderFourStar = CreateDetailBorder();
             var stackPanelFourStar = new StackPanel();
-            stackPanelFourStar.Children.Add(new TextBlock { Text = $"距离上一个四星已经抽了{countSinceLast4Star}发", FontWeight = FontWeights.Bold });
+            stackPanelFourStar.Children.Add(new TextBlock { Text = $"距离上一个A级已经抽了{countSinceLast4Star}发", FontWeight = FontWeights.Bold });
 
             if (selectedCardPool != null && selectedCardPool.FourStarPity.HasValue)
             {
