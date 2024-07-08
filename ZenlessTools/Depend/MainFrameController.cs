@@ -22,7 +22,6 @@ using Microsoft.UI.Xaml.Controls;
 using ZenlessTools.Views.ToolViews;
 using ZenlessTools.Views;
 using System;
-using ZenlessTools.Views.JSGAccountViews;
 
 namespace ZenlessTools.Depend
 {
@@ -47,9 +46,6 @@ namespace ZenlessTools.Depend
                     break;
                 case "gacha":
                     mainFrame.Navigate(typeof(GachaView));
-                    break;
-                case "jsg_account":
-                    mainFrame.Navigate(typeof(AccountView));
                     break;
                 case "donation":
                     mainFrame.Navigate(typeof(DonationView));

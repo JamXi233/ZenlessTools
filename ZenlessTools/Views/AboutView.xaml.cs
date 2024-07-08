@@ -40,7 +40,7 @@ namespace ZenlessTools.Views
 {
     public sealed partial class AboutView : Page
     {
-        private readonly GetGiteeLatest _getGiteeLatest = new GetGiteeLatest();
+        private readonly GetGithubLatest _getGithubLatest = new GetGithubLatest();
         private readonly GetJSGLatest _getJSGLatest = new GetJSGLatest();
 
         private bool isProgrammaticChange = false;
@@ -76,7 +76,8 @@ namespace ZenlessTools.Views
         {
             consoleToggle.IsChecked = AppDataController.GetConsoleMode() == 1;
             terminalToggle.IsChecked = AppDataController.GetTerminalMode() == 1;
-            userviceRadio.SelectedIndex = new[] { 1, 2, 0 }[AppDataController.GetUpdateService()];
+            autoCheckUpdateToggle.IsChecked = AppDataController.GetAutoCheckUpdate() == 1;
+            userviceRadio.SelectedIndex = AppDataController.GetUpdateService() == 0 ? 1 : AppDataController.GetUpdateService() == 2 ? 0 : -1;
             themeRadio.SelectedIndex = AppDataController.GetDayNight();
         }
 
@@ -87,7 +88,6 @@ namespace ZenlessTools.Views
             installSFF.IsEnabled = !File.Exists(Path.Combine(fontsFolderPath, "SegoeIcons.ttf")) || !File.Exists(Path.Combine(fontsFolderPath, "Segoe Fluent Icons.ttf"));
             installSFF.Content = installSFF.IsEnabled ? "安装图标字体" : "图标字体正常";
         }
-
 
         private async void GetVersionButton()
         {
@@ -100,13 +100,11 @@ namespace ZenlessTools.Views
             }
         }
 
-
         private void Console_Toggle(object sender, RoutedEventArgs e)
         {
             if (consoleToggle.IsChecked ?? false) TerminalMode.ShowConsole(); else TerminalMode.HideConsole();
             AppDataController.SetConsoleMode(consoleToggle.IsChecked == true ? 1 : 0);
         }
-
 
         private void TerminalMode_Toggle(object sender, RoutedEventArgs e)
         {
@@ -114,6 +112,10 @@ namespace ZenlessTools.Views
             AppDataController.SetTerminalMode(terminalToggle.IsChecked == true ? 1 : 0);
         }
 
+        private void Auto_Check_Update_Toggle(object sender, RoutedEventArgs e)
+        {
+            AppDataController.SetAutoCheckUpdate(autoCheckUpdateToggle.IsChecked == true ? 1 : 0);
+        }
 
         public void Clear_AllData_TipShow(object sender, RoutedEventArgs e)
         {
@@ -233,13 +235,13 @@ namespace ZenlessTools.Views
             }
         }
 
-
         public async void StartUpdate()
         {
             UpdateTip.IsOpen = false;
             WaitOverlayManager.RaiseWaitOverlay(true, "正在更新", "请稍等片刻", true, 0);
             await InstallerHelper.GetInstaller();
-            if (InstallerHelper.RunInstaller() != 0)
+            string channelArgument = GetChannelArgument();
+            if (InstallerHelper.RunInstaller(channelArgument) != 0)
             {
                 NotificationManager.RaiseNotification("更新失败", "", InfoBarSeverity.Error, true, 3);
             }
@@ -251,7 +253,8 @@ namespace ZenlessTools.Views
             UpdateTip.IsOpen = false;
             WaitOverlayManager.RaiseWaitOverlay(true, "正在强制重装ZenlessTools", "请稍等片刻", true, 0);
             await InstallerHelper.GetInstaller();
-            if (InstallerHelper.RunInstaller("/force") != 0)
+            string channelArgument = GetChannelArgument();
+            if (InstallerHelper.RunInstaller($"/force {channelArgument}") != 0)
             {
                 NotificationManager.RaiseNotification("更新失败", "", InfoBarSeverity.Error, true, 3);
             }
@@ -263,7 +266,8 @@ namespace ZenlessTools.Views
             UpdateTip.IsOpen = false;
             WaitOverlayManager.RaiseWaitOverlay(true, "正在更新依赖", "请稍等片刻", true, 0);
             await InstallerHelper.GetInstaller();
-            InstallerHelper.RunInstaller("/depend");
+            string channelArgument = GetChannelArgument();
+            InstallerHelper.RunInstaller($"/depend {channelArgument}");
             WaitOverlayManager.RaiseWaitOverlay(false);
         }
 
@@ -272,12 +276,25 @@ namespace ZenlessTools.Views
             UpdateTip.IsOpen = false;
             WaitOverlayManager.RaiseWaitOverlay(true, "正在强制重装依赖", "请稍等片刻", true, 0);
             await InstallerHelper.GetInstaller();
-            if (InstallerHelper.RunInstaller("/depend /force") != 0)
+            string channelArgument = GetChannelArgument();
+            if (InstallerHelper.RunInstaller($"/depend /force {channelArgument}") != 0)
             {
                 NotificationManager.RaiseNotification("强制重装依赖失败", "", InfoBarSeverity.Error, true, 3);
             }
             WaitOverlayManager.RaiseWaitOverlay(false);
         }
+
+        private string GetChannelArgument()
+        {
+            int channel = AppDataController.GetUpdateService();
+            return channel switch
+            {
+                0 => "/channel github",
+                2 => "/channel ds",
+                _ => string.Empty
+            };
+        }
+
 
         // 选择主题开始
         private void ThemeRadio_Follow(object sender, RoutedEventArgs e)
@@ -299,11 +316,6 @@ namespace ZenlessTools.Views
         private void uservice_Github_Choose(object sender, RoutedEventArgs e)
         {
             if (!isProgrammaticChange) { AppDataController.SetUpdateService(0); }
-        }
-
-        private void uservice_Gitee_Choose(object sender, RoutedEventArgs e)
-        {
-            if (!isProgrammaticChange) { AppDataController.SetUpdateService(1); }
         }
 
         private void uservice_JSG_Choose(object sender, RoutedEventArgs e)

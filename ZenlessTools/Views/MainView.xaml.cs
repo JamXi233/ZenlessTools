@@ -1,4 +1,24 @@
-﻿using System;
+﻿// Copyright (c) 2021-2024, JamXi JSG-LLC.
+// All rights reserved.
+
+// This file is part of ZenlessTools.
+
+// ZenlessTools is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+
+// ZenlessTools is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+
+// You should have received a copy of the GNU General Public License
+// along with ZenlessTools.  If not, see <http://www.gnu.org/licenses/>.
+
+// For more information, please refer to <https://www.gnu.org/licenses/gpl-3.0.html>
+
+using System;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media.Imaging;
@@ -171,26 +191,11 @@ namespace ZenlessTools.Views
                 Logging.Write("Getting Button Image Error: " + e.Message, 0);
             }
 
-            var result = await GetUpdate.GetDependUpdate();
-            var status = result.Status;
-            if (status == 1)
-            {
-                NotificationManager.RaiseNotification("更新提示", "依赖包需要更新\n请尽快到[设置-检查依赖更新]进行更新", InfoBarSeverity.Warning, false, 5);
-            }
-            result = await GetUpdate.GetZenlessToolsUpdate();
-            status = result.Status;
-            if (status == 1)
-            {
-                NotificationManager.RaiseNotification("更新提示", "ZenlessTools有更新\n可到[设置-检查更新]进行更新", InfoBarSeverity.Warning, false, 5);
-            }
-
             loadRing.Visibility = Visibility.Collapsed;
         }
 
 
-
-
-
+        
 
         private async Task<string> FetchData(string url)
         {

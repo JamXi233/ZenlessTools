@@ -14,18 +14,6 @@ namespace ZenlessTools.Depend
 {
     public class GachaRecords
     {
-        public string Uid { get; set; }
-        public string GachaId { get; set; }
-        public string GachaType { get; set; }
-        public string ItemId { get; set; }
-        public string Count { get; set; }
-        public string Time { get; set; }
-        public string Name { get; set; }
-        public string Lang { get; set; }
-        public string ItemType { get; set; }
-        public string RankType { get; set; }
-        public string Id { get; set; }
-
         public async static Task GetGachaAsync(string url)
         {
             string documentsPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
@@ -33,21 +21,17 @@ namespace ZenlessTools.Depend
 
             Directory.CreateDirectory(zenlessToolsFolderPath);
 
-            var charRecords = await new GachaRecords().GetAllGachaRecordsAsync(url, null, "2001", "2");
-            var lightRecords = await new GachaRecords().GetAllGachaRecordsAsync(url, null, "3001", "3");
-            var regularRecords = await new GachaRecords().GetAllGachaRecordsAsync(url, null, "1001", "1");
+            var charRecords = await GetAllGachaRecordsAsync(url, "2001", "2");
+            var lightRecords = await GetAllGachaRecordsAsync(url, "3001", "3");
+            var regularRecords = await GetAllGachaRecordsAsync(url, "1001", "1");
 
-            if ((charRecords == null || charRecords.Count == 0) &&
-                (lightRecords == null || lightRecords.Count == 0) &&
-                (regularRecords == null || regularRecords.Count == 0))
+            if (charRecords.Count == 0 && lightRecords.Count == 0 && regularRecords.Count == 0)
             {
                 Logging.Write("未能获取任何调频记录，请检查链接或重试", 1);
                 return;
             }
 
-            string uid = charRecords?.FirstOrDefault()?.Uid ??
-                         lightRecords?.FirstOrDefault()?.Uid ??
-                         regularRecords?.FirstOrDefault()?.Uid;
+            string uid = charRecords.FirstOrDefault()?.Uid ?? lightRecords.FirstOrDefault()?.Uid ?? regularRecords.FirstOrDefault()?.Uid;
 
             if (string.IsNullOrEmpty(uid) || uid.Length != 8)
             {
@@ -56,21 +40,17 @@ namespace ZenlessTools.Depend
             }
 
             string filePath = Path.Combine(zenlessToolsFolderPath, $"{uid}.json");
-
-            var existingData = new GachaData { info = new GachaInfo(), list = new List<GachaPool>() };
+            var existingData = new GachaData { info = new GachaInfo { uid = uid }, list = new List<GachaPool>() };
 
             if (File.Exists(filePath))
             {
                 var jsonData = await File.ReadAllTextAsync(filePath);
-                existingData = JsonConvert.DeserializeObject<GachaData>(jsonData) ?? new GachaData { info = new GachaInfo(), list = new List<GachaPool>() };
+                existingData = JsonConvert.DeserializeObject<GachaData>(jsonData) ?? existingData;
             }
-            existingData.info.uid = uid;
-            existingData.list = existingData.list ?? new List<GachaPool>();
 
-            
-            MergeRecords(existingData, charRecords, 2);
-            MergeRecords(existingData, lightRecords, 3);
-            MergeRecords(existingData, regularRecords, 1);
+            await MergeRecords(existingData, charRecords, 2);
+            await MergeRecords(existingData, lightRecords, 3);
+            await MergeRecords(existingData, regularRecords, 1);
 
             foreach (var pool in existingData.list)
             {
@@ -83,17 +63,17 @@ namespace ZenlessTools.Depend
             Logging.Write($"调频记录已保存到 {filePath}", 0);
         }
 
-        private static void MergeRecords(GachaData existingData, List<GachaRecords> newRecords, int cardPoolId)
+        private static async Task MergeRecords(GachaData existingData, List<GachaRecords> newRecords, int cardPoolId)
         {
-            var pool = existingData.list.FirstOrDefault(p => p.cardPoolId == cardPoolId);
-            if (pool == null)
+            var pool = existingData.list.FirstOrDefault(p => p.cardPoolId == cardPoolId) ?? new GachaPool
             {
-                pool = new GachaPool
-                {
-                    cardPoolId = cardPoolId,
-                    cardPoolType = GetCardPoolType(cardPoolId),
-                    records = new List<GachaRecord>()
-                };
+                cardPoolId = cardPoolId,
+                cardPoolType = GetCardPoolType(cardPoolId),
+                records = new List<GachaRecord>()
+            };
+
+            if (!existingData.list.Contains(pool))
+            {
                 existingData.list.Add(pool);
             }
 
@@ -117,6 +97,7 @@ namespace ZenlessTools.Depend
             }
         }
 
+
         private static string GetCardPoolType(int cardPoolId)
         {
             return cardPoolId switch
@@ -128,101 +109,88 @@ namespace ZenlessTools.Depend
             };
         }
 
-        public async Task<List<GachaRecords>> GetAllGachaRecordsAsync(string url, string localData = null, string gachaType = "3001", string realGachaType = "3")
+        public async static Task<List<GachaRecords>> GetAllGachaRecordsAsync(string url, string gachaType, string realGachaType)
         {
+            var client = new HttpClient();
             var records = new List<GachaRecords>();
-            if (localData == null)
+            var count = 0;
+            int urlIndex = url.IndexOf("&gacha_type=");
+            var endId = "0";
+
+            while (true)
             {
-                var page = 1;
-                var count = 0;
-                var endId = "0";
-                int urlindex = url.IndexOf("&gacha_type=");
-                while (true)
+                try
                 {
-                    try
+                    string newUrl = $"{url.Substring(0, urlIndex)}&gacha_type={gachaType}&real_gacha_type={realGachaType}&end_id={endId}";
+                    var response = await client.GetAsync(newUrl);
+                    var json = await response.Content.ReadAsStringAsync();
+                    var jsonObj = JObject.Parse(json);
+
+                    if (jsonObj["message"].ToString() == "authkey timeout")
                     {
-                        var client = new HttpClient();
-                        await Task.Delay(TimeSpan.FromSeconds(0.08));
-                        Logging.Write("Wait Timeout...", 0);
-                        var newurl = url.Substring(0, urlindex) + "&gacha_type=" + gachaType + "&real_gacha_type=" + realGachaType + "&end_id=" + endId;
-                        var response = await client.GetAsync(newurl);
-                        if (!response.IsSuccessStatusCode) break;
-                        var json = await response.Content.ReadAsStringAsync();
-                        var data = System.Text.Json.JsonSerializer.Deserialize<JsonElement>(json).GetProperty("data");
-                        Logging.Write(url.Substring(0, urlindex) + "&gacha_type=" + gachaType + "&real_gacha_type=" + realGachaType + "&end_id=" + endId, 0);
-                        JObject jsonObj = JObject.Parse(json);
-                        if (jsonObj["message"].ToString() == "authkey timeout")
-                        {
-                            records.Add(new GachaRecords
-                            {
-                                Uid = jsonObj["message"].ToString(),
-                                GachaId = "",
-                                GachaType = "",
-                                ItemId = "",
-                                Count = "",
-                                Time = "",
-                                Name = "",
-                                Lang = "",
-                                ItemType = "",
-                                RankType = "",
-                                Id = ""
-                            });
-                            return records;
-                        }
-                        else
-                        {
-                            if (data.GetProperty("list").GetArrayLength() == 0) break;
-                            foreach (var item in data.GetProperty("list").EnumerateArray())
-                            {
-                                records.Add(new GachaRecords
-                                {
-                                    Uid = item.GetProperty("uid").GetString(),
-                                    GachaId = item.GetProperty("gacha_id").GetString(),
-                                    GachaType = item.GetProperty("gacha_type").GetString(),
-                                    ItemId = item.GetProperty("item_id").GetString(),
-                                    Count = item.GetProperty("count").GetString(),
-                                    Time = item.GetProperty("time").GetString(),
-                                    Name = item.GetProperty("name").GetString(),
-                                    Lang = item.GetProperty("lang").GetString(),
-                                    ItemType = item.GetProperty("item_type").GetString(),
-                                    RankType = item.GetProperty("rank_type").GetString(),
-                                    Id = item.GetProperty("id").GetString()
-                                });
-                                count++;
-                                Logging.Write(item.GetProperty("uid").GetString() + "|" + item.GetProperty("time").GetString() + "|" + item.GetProperty("gacha_id").GetString() + "|" + item.GetProperty("name").GetString() + "|" + item.GetProperty("id").GetString(), 0);
-                                WaitOverlayManager.RaiseWaitOverlay(true, "正在获取API信息,请不要退出", "已获取" + count + "条记录" + item.GetProperty("uid").GetString() + "|" + item.GetProperty("time").GetString() + "|" + item.GetProperty("name").GetString(), true, 0);
-                            }
-                            endId = records.Last().Id;
-                            page++;
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        records.Add(new GachaRecords
-                        {
-                            Uid = ex.Message,
-                            GachaId = "",
-                            GachaType = "",
-                            ItemId = "",
-                            Count = "",
-                            Time = "",
-                            Name = "",
-                            Lang = "",
-                            ItemType = "",
-                            RankType = "",
-                            Id = ""
-                        });
+                        records.Add(new GachaRecords { Uid = "authkey timeout" });
                         return records;
                     }
+                    if (jsonObj["message"].ToString() == "visit too frequently" && jsonObj["retcode"].ToString() == "-110")
+                    {
+                        Logging.Write("等待...", 1);
+                        WaitOverlayManager.RaiseWaitOverlay(true, "正在获取API信息,请不要退出", "等待...", true, 0);
+                        await Task.Delay(TimeSpan.FromSeconds(0.05));
+                        continue;
+                    }
+
+                    var data = jsonObj["data"];
+                    if (data["list"].Count() == 0) break;
+
+                    foreach (var item in data["list"])
+                    {
+                        var gachaRecord = new GachaRecords
+                        {
+                            Uid = item["uid"].ToString(),
+                            GachaId = item["gacha_id"].ToString(),
+                            GachaType = item["gacha_type"].ToString(),
+                            ItemId = item["item_id"].ToString(),
+                            Count = item["count"].ToString(),
+                            Time = item["time"].ToString(),
+                            Name = item["name"].ToString(),
+                            Lang = item["lang"].ToString(),
+                            ItemType = item["item_type"].ToString(),
+                            RankType = item["rank_type"].ToString(),
+                            Id = item["id"].ToString()
+                        };
+
+                        records.Add(gachaRecord);
+                        count++;
+
+                        string logMessage = $"{gachaRecord.Uid}|{gachaRecord.Time}|{gachaRecord.GachaId}|{gachaRecord.Name}|{gachaRecord.Id}";
+                        Logging.Write(logMessage, 0);
+
+                        string overlayMessage = $"已获取{count}条记录 {gachaRecord.Uid}|{gachaRecord.Time}|{gachaRecord.Name}";
+                        WaitOverlayManager.RaiseWaitOverlay(true, "正在获取API信息,请不要退出", overlayMessage, true, 0);
+                    }
+
+                    endId = records.Last().Id;
+
                 }
-            }
-            else
-            {
-                records = JsonConvert.DeserializeObject<List<GachaRecords>>(localData);
+                catch (Exception ex)
+                {
+                    records.Add(new GachaRecords { Uid = ex.Message });
+                    return records;
+                }
             }
             Logging.Write("Gacha Get Finished!", 0);
             return records;
         }
+        public string Uid { get; set; }
+        public string GachaId { get; set; }
+        public string GachaType { get; set; }
+        public string ItemId { get; set; }
+        public string Count { get; set; }
+        public string Time { get; set; }
+        public string Name { get; set; }
+        public string Lang { get; set; }
+        public string ItemType { get; set; }
+        public string RankType { get; set; }
+        public string Id { get; set; }
     }
 }
-

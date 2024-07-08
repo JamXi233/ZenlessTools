@@ -96,6 +96,10 @@ namespace ZenlessTools
             await InitializeAppDataAsync();
             await BackgroundImageAsync();
             CleanUpdate();
+            if (AppDataController.GetAutoCheckUpdate() == 1)
+            {
+                await AutoGetUpdate();
+            }
         }
 
         private void InitShiftPress()
@@ -178,6 +182,23 @@ namespace ZenlessTools
                     Logging.Write($"Unknown FirstRunStatus: {firstRunStatus}", 2);
                     FirstRun_Frame.Navigate(typeof(FirstRunInit));
                     break;
+            }
+        }
+
+        private async Task AutoGetUpdate()
+        {
+
+            var result = await GetUpdate.GetDependUpdate();
+            var status = result.Status;
+            if (status == 1)
+            {
+                NotificationManager.RaiseNotification("更新提示", "依赖包需要更新\n请尽快到[设置-检查依赖更新]进行更新", InfoBarSeverity.Warning, false, 5);
+            }
+            result = await GetUpdate.GetZenlessToolsUpdate();
+            status = result.Status;
+            if (status == 1)
+            {
+                NotificationManager.RaiseNotification("更新提示", "ZenlessTools有更新\n可到[设置-检查更新]进行更新", InfoBarSeverity.Warning, false, 5);
             }
         }
 

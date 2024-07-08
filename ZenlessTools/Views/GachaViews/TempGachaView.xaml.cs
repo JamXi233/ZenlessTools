@@ -151,7 +151,7 @@ namespace ZenlessTools.Views.GachaViews
         {
             Logging.Write("Calculating pity", 0);
             var selectedCardPool = cardPoolInfo.CardPools.FirstOrDefault(cp => cp.CardPoolId == selectedCardPoolId);
-            var specialNames = new List<string> { "Ã¨ÓÖ", "11ºÅ", "çæÀÙæ§", "À³¿¨¶÷", "¸ñÀòË¿", "ÀöÄÈ" };
+            var specialNames = new List<string> { "Ã¨ÓÖ", "¡¸11ºÅ¡¹", "çæÀÙæ§", "À³¿¨¶÷", "¸ñÀòË¿", "ÀöÄÈ" };
 
             if (specialNames.Contains(name))
             {
