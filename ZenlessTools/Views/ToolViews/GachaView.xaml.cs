@@ -48,7 +48,6 @@ using System.Runtime.InteropServices;
 using Windows.Graphics;
 using Windows.Storage.Pickers;
 using WinRT.Interop;
-using ZenlessTools.Depend;
 
 
 namespace ZenlessTools.Views.ToolViews
@@ -222,9 +221,10 @@ namespace ZenlessTools.Views.ToolViews
 
                 if (uidSet.Count == 0)
                 {
-                    //NotificationManager.RaiseNotification($"抽卡分析", "无调频记录", InfoBarSeverity.Warning);
+                    gachaView.Visibility = Visibility.Collapsed;
                     loadGachaProgress.Visibility = Visibility.Collapsed;
                     noGachaFound.Visibility = Visibility.Visible;
+                    ExportUIGF.IsEnabled = false;
                     return;
                 }
 
@@ -235,6 +235,7 @@ namespace ZenlessTools.Views.ToolViews
                     loadGachaProgress.Visibility = Visibility.Collapsed;
                     noGachaFound.Visibility = Visibility.Collapsed;
                     gachaView.Visibility = Visibility.Visible;
+                    ExportUIGF.IsEnabled = true;
                     ClearGacha.IsEnabled = true;
                 }
             }

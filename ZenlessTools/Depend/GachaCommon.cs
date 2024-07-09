@@ -217,6 +217,7 @@ namespace ZenlessTools.Depend
             };
             var finalSourceJson = JsonConvert.SerializeObject(finalSourceData, settings);
 
+            Directory.CreateDirectory(recordsBasePath);
             await File.WriteAllTextAsync(targetFilePath, finalSourceJson);
             NotificationManager.RaiseNotification("调频记录导入完成", null, InfoBarSeverity.Success, true, 2);
         }
