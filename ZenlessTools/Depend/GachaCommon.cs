@@ -1,12 +1,15 @@
-﻿using Newtonsoft.Json;
+﻿using Microsoft.UI.Xaml.Controls;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Threading.Tasks;
 using Windows.ApplicationModel;
+using static ZenlessTools.App;
 
-namespace WaveTools.Depend
+namespace ZenlessTools.Depend
 {
     public class GachaCommon
     {
@@ -35,13 +38,15 @@ namespace WaveTools.Depend
 
         public class SourceGachaRecord
         {
-            public string cardPoolType { get; set; }
-            public int resourceId { get; set; }
-            public int qualityLevel { get; set; }
-            public string resourceType { get; set; }
-            public string name { get; set; }
-            public int count { get; set; }
+            public string gachaId { get; set; }
+            public string gachaType { get; set; }
+            public string itemId { get; set; }
+            public string count { get; set; }
             public string time { get; set; }
+            public string name { get; set; }
+            public string lang { get; set; }
+            public string itemType { get; set; }
+            public string rankType { get; set; }
             public string id { get; set; }
         }
 
@@ -57,13 +62,12 @@ namespace WaveTools.Depend
             public SourceInfo info { get; set; }
             public List<SourceRecord> list { get; set; }
         }
+    }
 
-        public static string GenerateUniqueId(long timestamp, int cardPoolId, int drawNumber)
-        {
-            return $"{timestamp:D10}{cardPoolId:D4}000{drawNumber:D2}";
-        }
-
-
+    public class CardPoolInfo
+    {
+        public Dictionary<string, string> CardPoolTypes { get; set; }
+        public Dictionary<string, int> CardPoolIds { get; set; }
     }
 
     public class ImportGacha
@@ -74,207 +78,293 @@ namespace WaveTools.Depend
             public List<GachaCommon.GachaRecord> list { get; set; }
         }
 
+        public class CardPoolRule
+        {
+            public int cardPoolId { get; set; }
+            public string cardPoolType { get; set; }
+        }
+
+        public class CardPoolRules
+        {
+            public List<CardPoolRule> cardPools { get; set; }
+        }
+
+        public class ImportUser
+        {
+            public string uid { get; set; }
+            public int timezone { get; set; }
+            public string lang { get; set; }
+            public List<GachaCommon.GachaRecord> list { get; set; }
+        }
+
+        public class ImportFormat
+        {
+            public ExportGacha.ExportInfo info { get; set; }
+            public List<ImportUser> nap { get; set; }
+        }
+
         public static async Task Import(string importFilePath)
         {
-            // 读取导入文件
+            var cardPoolRules = await GetCardPoolRulesAsync();
+            var cardPoolInfo = await GetCardPoolInfoAsync();
+
             var importJson = await File.ReadAllTextAsync(importFilePath);
-            var importData = JsonConvert.DeserializeObject<ImportData>(importJson);
+            var importFormat = JsonConvert.DeserializeObject<ImportFormat>(importJson);
 
-            if (importData?.info?.uid == null)
+            if (importFormat?.nap == null || importFormat.nap.Count == 0)
             {
-                throw new InvalidOperationException("Invalid import file: missing uid.");
+                NotificationManager.RaiseNotification("导入抽卡记录失败", "未找到nap字段", InfoBarSeverity.Error, true, 3);
+                return;
             }
 
-            string uid = importData.info.uid;
-            string recordsBasePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), @"JSG-LLC\WaveTools\GachaRecords");
+            var firstUser = importFormat.nap.First();
+            string uid = firstUser.uid;
+
+            if (string.IsNullOrEmpty(uid))
+            {
+                NotificationManager.RaiseNotification("导入抽卡记录失败", "UID丢失", InfoBarSeverity.Error, true, 3);
+                return;
+            }
+
+            string recordsBasePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), @"JSG-LLC\ZenlessTools\GachaRecords");
             string targetFilePath = Path.Combine(recordsBasePath, $"{uid}.json");
-            string tempExportFilePath = Path.Combine(recordsBasePath, "tmp", $"{uid}.json");
 
-            // 确保临时目录存在
-            Directory.CreateDirectory(Path.Combine(recordsBasePath, "tmp"));
+            var sourceData = File.Exists(targetFilePath)
+                ? JsonConvert.DeserializeObject<GachaCommon.SourceData>(await File.ReadAllTextAsync(targetFilePath))
+                  ?? new GachaCommon.SourceData { info = new GachaCommon.SourceInfo { uid = uid }, list = new List<GachaCommon.SourceRecord>() }
+                : new GachaCommon.SourceData { info = new GachaCommon.SourceInfo { uid = uid }, list = new List<GachaCommon.SourceRecord>() };
 
-            // 如果文件存在，读取现有数据并导出到临时文件
-            if (File.Exists(targetFilePath))
-            {
-                var existingJson = await File.ReadAllTextAsync(targetFilePath);
-                var sourceData = JsonConvert.DeserializeObject<GachaCommon.SourceData>(existingJson) ?? new GachaCommon.SourceData { info = new GachaCommon.SourceInfo { uid = uid }, list = new List<GachaCommon.SourceRecord>() };
-
-                ExportGacha.Export(targetFilePath, tempExportFilePath);
-
-                // 读取导出的临时文件
-                var tempExportJson = await File.ReadAllTextAsync(tempExportFilePath);
-                var tempExportData = JsonConvert.DeserializeObject<ImportData>(tempExportJson);
-
-                if (tempExportData.info.uid != importData.info.uid)
-                {
-                    throw new InvalidOperationException("UID mismatch between existing records and import file.");
-                }
-
-                // 合并记录
-                var existingRecords = tempExportData.list.ToDictionary(record => record.id, record => record);
-                foreach (var importRecord in importData.list)
-                {
-                    existingRecords[importRecord.id] = importRecord;
-                }
-
-                importData.list = existingRecords.Values.ToList();
-            }
-
-            // 准备合并后的源数据
             var finalSourceData = new GachaCommon.SourceData
             {
                 info = new GachaCommon.SourceInfo { uid = uid },
                 list = new List<GachaCommon.SourceRecord>()
             };
 
-            var existingSourceRecords = finalSourceData.list.SelectMany(record => record.records).ToDictionary(record => record.id, record => record);
-            foreach (var importRecord in importData.list)
+            // 初始化 finalSourceData 以包含所有 CardPoolType
+            foreach (var cardPoolType in cardPoolInfo.CardPoolTypes)
             {
-                if (!existingSourceRecords.ContainsKey(importRecord.id))
+                finalSourceData.list.Add(new GachaCommon.SourceRecord
                 {
-                    int cardPoolId = int.Parse(importRecord.gacha_id);
-                    var sourceRecord = new GachaCommon.SourceGachaRecord
-                    {
-                        resourceId = int.Parse(importRecord.item_id),
-                        qualityLevel = int.Parse(importRecord.rank_type),
-                        resourceType = importRecord.item_type,
-                        name = importRecord.name,
-                        count = int.Parse(importRecord.count),
-                        time = importRecord.time,
-                        id = importRecord.id
-                    };
+                    cardPoolId = int.Parse(cardPoolType.Key),
+                    cardPoolType = cardPoolType.Value,
+                    records = new List<GachaCommon.SourceGachaRecord>()
+                });
+            }
 
-                    if (!finalSourceData.list.Any(r => r.cardPoolId == cardPoolId))
+            // 处理导入记录
+            foreach (var importRecord in firstUser.list)
+            {
+                int cardPoolId = int.Parse(importRecord.gacha_type);
+                var cardPoolType = cardPoolRules.FirstOrDefault(r => r.cardPoolId == cardPoolId)?.cardPoolType ?? "未知频段";
+
+                var sourceRecord = new GachaCommon.SourceGachaRecord
+                {
+                    gachaId = importRecord.gacha_id,
+                    gachaType = importRecord.gacha_type,
+                    itemId = importRecord.item_id,
+                    rankType = importRecord.rank_type,
+                    itemType = importRecord.item_type,
+                    name = importRecord.name,
+                    count = importRecord.count,
+                    time = importRecord.time,
+                    id = importRecord.id
+                };
+
+                var existingSourceRecord = finalSourceData.list.FirstOrDefault(r => r.cardPoolId == cardPoolId);
+                if (existingSourceRecord != null)
+                {
+                    existingSourceRecord.cardPoolType = cardPoolType; // 更新 cardPoolType
+                    var existingGachaRecord = existingSourceRecord.records.FirstOrDefault(r => r.id == importRecord.id);
+                    if (existingGachaRecord == null)
                     {
-                        finalSourceData.list.Add(new GachaCommon.SourceRecord
-                        {
-                            cardPoolId = cardPoolId,
-                            cardPoolType = importRecord.gacha_type,
-                            records = new List<GachaCommon.SourceGachaRecord> { sourceRecord }
-                        });
+                        existingSourceRecord.records.Add(sourceRecord);
                     }
                     else
                     {
-                        finalSourceData.list.First(r => r.cardPoolId == cardPoolId).records.Add(sourceRecord);
+                        existingGachaRecord.gachaId = sourceRecord.gachaId;
+                        existingGachaRecord.gachaType = sourceRecord.gachaType;
+                        existingGachaRecord.itemId = sourceRecord.itemId;
+                        existingGachaRecord.rankType = sourceRecord.rankType;
+                        existingGachaRecord.itemType = sourceRecord.itemType;
+                        existingGachaRecord.name = sourceRecord.name;
+                        existingGachaRecord.count = sourceRecord.count;
+                        existingGachaRecord.time = sourceRecord.time;
                     }
-
-                    existingSourceRecords[importRecord.id] = sourceRecord;
+                }
+                else
+                {
+                    // 如果没有找到相应的 cardPoolId, 创建一个新的记录并添加到 finalSourceData
+                    finalSourceData.list.Add(new GachaCommon.SourceRecord
+                    {
+                        cardPoolId = cardPoolId,
+                        cardPoolType = cardPoolType,
+                        records = new List<GachaCommon.SourceGachaRecord> { sourceRecord }
+                    });
                 }
             }
 
-            // 确保目录存在
-            Directory.CreateDirectory(recordsBasePath);
-
-            // 对记录先按 cardPoolId 排序，然后按 id 倒序排序
-            finalSourceData.list = finalSourceData.list.OrderBy(record => record.cardPoolId).ToList();
+            // 排序和序列化
+            finalSourceData.list = SortGachaRecords(finalSourceData.list);
             foreach (var sourceRecord in finalSourceData.list)
             {
                 sourceRecord.records = sourceRecord.records.OrderByDescending(record => record.id).ToList();
             }
 
-            // 序列化时移除 records 中的 cardPoolType 字段
             var settings = new JsonSerializerSettings
             {
                 Formatting = Formatting.Indented,
                 NullValueHandling = NullValueHandling.Ignore
             };
             var finalSourceJson = JsonConvert.SerializeObject(finalSourceData, settings);
+
             await File.WriteAllTextAsync(targetFilePath, finalSourceJson);
-            Directory.Delete(Path.Combine(recordsBasePath, "tmp"), true);
+            NotificationManager.RaiseNotification("调频记录导入完成", null, InfoBarSeverity.Success, true, 2);
+        }
+
+        private static async Task<List<CardPoolRule>> GetCardPoolRulesAsync()
+        {
+            var cardPoolRules = await GetDataAsync<CardPoolRules>("https://zentools.jamsg.cn/api/cardPoolRule").ConfigureAwait(false);
+            return cardPoolRules.cardPools;
+        }
+
+
+        public static async Task<CardPoolInfo> GetCardPoolInfoAsync()
+        {
+            return await GetDataAsync<CardPoolInfo>("https://zentools.jamsg.cn/api/cardPoolInfo").ConfigureAwait(false);
+        }
+
+        private static async Task<T> GetDataAsync<T>(string url)
+        {
+            using var client = new HttpClient();
+            var response = await client.GetStringAsync(url);
+            return JsonConvert.DeserializeObject<T>(response);
+        }
+
+        private static List<GachaCommon.SourceRecord> SortGachaRecords(List<GachaCommon.SourceRecord> records)
+        {
+            return records
+                .OrderBy(record => GetSortOrder(record.cardPoolId))
+                .ThenBy(record => record.cardPoolType == "未知频段" ? 1 : 0)
+                .ToList();
+        }
+
+        private static int GetSortOrder(int cardPoolId)
+        {
+            return cardPoolId switch
+            {
+                2 => 1,
+                3 => 2,
+                1 => 95, // 确保类型为 1 的卡池在最底部
+                5 => 96,
+                _ => 100
+            };
         }
     }
 
-
-
     public class ExportGacha
     {
-        public class ExportInfo : GachaCommon.Info
+        public class ExportInfo
         {
-            public string lang { get; set; }
-            public int region_time_zone { get; set; }
             public long export_timestamp { get; set; }
             public string export_app { get; set; }
             public string export_app_version { get; set; }
-            public string wwgf_version { get; set; }
+            public string version { get; set; } = "v4.0";
+        }
+
+        public class ExportUser
+        {
+            public string uid { get; set; }
+            public int timezone { get; set; }
+            public string lang { get; set; }
+            public List<GachaCommon.GachaRecord> list { get; set; }
         }
 
         public class ExportData
         {
             public ExportInfo info { get; set; }
-            public List<GachaCommon.GachaRecord> list { get; set; }
+            public List<ExportUser> nap { get; set; }
         }
 
-        public static void Export(string sourceFilePath, string exportFilePath)
+        public static async Task ExportAsync(string sourceFilePath, string exportFilePath)
         {
-            // 读取源文件
-            var sourceJson = File.ReadAllText(sourceFilePath);
+            var sourceJson = await File.ReadAllTextAsync(sourceFilePath);
             var sourceData = JsonConvert.DeserializeObject<GachaCommon.SourceData>(sourceJson);
+
             PackageVersion packageVersion = Package.Current.Id.Version;
             string currentVersion = $"{packageVersion.Major}.{packageVersion.Minor}.{packageVersion.Build}.{packageVersion.Revision}";
 
-            // 准备导出数据
             var exportData = new ExportData
             {
                 info = new ExportInfo
                 {
-                    uid = sourceData.info.uid,
-                    lang = "zh-cn",
-                    region_time_zone = 8,
                     export_timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
-                    export_app = "WaveTools",
+                    export_app = "ZenlessTools",
                     export_app_version = currentVersion,
-                    wwgf_version = "v0.1b"
+                    version = "v4.0"
                 },
-                list = new List<GachaCommon.GachaRecord>()
+                nap = new List<ExportUser>
+            {
+                new ExportUser
+                {
+                    uid = sourceData.info.uid,
+                    timezone = 8,
+                    lang = "zh-cn",
+                    list = new List<GachaCommon.GachaRecord>()
+                }
+            }
             };
 
             var timestampCounter = new Dictionary<long, int>();
 
-            foreach (var sourceRecord in sourceData.list)
+            // 获取cardPoolInfo
+            var cardPoolInfo = await ImportGacha.GetCardPoolInfoAsync();
+
+            foreach (var sourceRecord in sourceData.list.OrderBy(record => GetSortOrder(record.cardPoolId, cardPoolInfo)))
             {
-                // 对 sourceRecord.records 按时间排序
-                var sortedRecords = sourceRecord.records.OrderBy(record => record.time).ToList();
-                foreach (var gachaRecord in sortedRecords)
+                foreach (var gachaRecord in sourceRecord.records.OrderBy(record => record.time))
                 {
-                    // 获取时间戳（秒级）
                     long timestamp = DateTimeOffset.Parse(gachaRecord.time).ToUnixTimeSeconds();
 
-                    // 计算一秒内的抽数，初始化为10
                     if (!timestampCounter.ContainsKey(timestamp))
                     {
-                        timestampCounter[timestamp] = Math.Min(sortedRecords.Count(record => DateTimeOffset.Parse(record.time).ToUnixTimeSeconds() == timestamp), 10);  // 初始化为当秒记录的总数或10
+                        timestampCounter[timestamp] = Math.Min(sourceRecord.records.Count(record => DateTimeOffset.Parse(record.time).ToUnixTimeSeconds() == timestamp), 10);
                     }
                     int drawNumber = timestampCounter[timestamp];
-                    timestampCounter[timestamp]--;  // 递减
+                    timestampCounter[timestamp]--;
 
-                    // 生成唯一的id
-                    string uniqueId = GachaCommon.GenerateUniqueId(timestamp, sourceRecord.cardPoolId, drawNumber);
+                    int gachaType = sourceRecord.cardPoolId;
+                    string gachaId = cardPoolInfo.CardPoolIds[gachaType.ToString()].ToString();
 
-                    // 删除 records 中的 cardPoolType 字段
-                    gachaRecord.cardPoolType = null;
-
-                    exportData.list.Add(new GachaCommon.GachaRecord
+                    exportData.nap[0].list.Add(new GachaCommon.GachaRecord
                     {
-                        gacha_id = sourceRecord.cardPoolId.ToString("D4"),
-                        gacha_type = sourceRecord.cardPoolType,
-                        item_id = gachaRecord.resourceId.ToString(),
+                        gacha_id = gachaId,
+                        gacha_type = gachaType.ToString(),
+                        item_id = gachaRecord.itemId.ToString(),
                         count = gachaRecord.count.ToString(),
                         time = gachaRecord.time,
                         name = gachaRecord.name,
-                        item_type = gachaRecord.resourceType,
-                        rank_type = gachaRecord.qualityLevel.ToString(),
-                        id = uniqueId
+                        item_type = gachaRecord.itemType,
+                        rank_type = gachaRecord.rankType.ToString(),
+                        id = gachaRecord.id
                     });
                 }
             }
 
-            // 对记录先按 cardPoolId 排序，然后按 id 倒序排序
-            exportData.list = exportData.list.OrderBy(record => record.gacha_id).ThenByDescending(record => record.id).ToList();
-
-            // 序列化并写入导出文件
             var exportJson = JsonConvert.SerializeObject(exportData, Formatting.Indented);
-            File.WriteAllText(exportFilePath, exportJson);
+            await File.WriteAllTextAsync(exportFilePath, exportJson);
+            NotificationManager.RaiseNotification("抽卡记录导出完成", $"文件已保存到\n{exportFilePath}", InfoBarSeverity.Success, true, 2);
+        }
+
+        private static int GetSortOrder(int cardPoolId, CardPoolInfo cardPoolInfo)
+        {
+            return cardPoolId switch
+            {
+                var id when id == cardPoolInfo.CardPoolIds["2"] => 1,
+                var id when id == cardPoolInfo.CardPoolIds["3"] => 2,
+                var id when id == cardPoolInfo.CardPoolIds["1"] => 95,
+                var id when id == cardPoolInfo.CardPoolIds["5"] => 96,
+                _ => 100
+            };
         }
     }
-
 }

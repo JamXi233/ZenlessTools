@@ -15,7 +15,7 @@ namespace ZenlessTools.Depend
             public string gachaType { get; set; }
             public string itemId { get; set; }
             public string count { get; set; }
-            public DateTime time { get; set; }
+            public string time { get; set; }
             public string name { get; set; }
             public string lang { get; set; }
             public string itemType { get; set; }

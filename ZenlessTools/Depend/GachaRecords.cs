@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using System.Net.Http;
 using Newtonsoft.Json.Linq;
@@ -24,6 +25,7 @@ namespace ZenlessTools.Depend
             var charRecords = await GetAllGachaRecordsAsync(url, "2001", "2");
             var lightRecords = await GetAllGachaRecordsAsync(url, "3001", "3");
             var regularRecords = await GetAllGachaRecordsAsync(url, "1001", "1");
+            var bangbooRecords = await GetAllGachaRecordsAsync(url, "5001", "5");
 
             if (charRecords.Count == 0 && lightRecords.Count == 0 && regularRecords.Count == 0)
             {
@@ -46,24 +48,39 @@ namespace ZenlessTools.Depend
             {
                 var jsonData = await File.ReadAllTextAsync(filePath);
                 existingData = JsonConvert.DeserializeObject<GachaData>(jsonData) ?? existingData;
+
+                // 对现有数据的时间格式进行修正
+                foreach (var pool in existingData.list)
+                {
+                    foreach (var record in pool.records)
+                    {
+                        record.time = CorrectTimeFormat(record.time);
+                    }
+                }
             }
 
-            await MergeRecords(existingData, charRecords, 2);
-            await MergeRecords(existingData, lightRecords, 3);
-            await MergeRecords(existingData, regularRecords, 1);
+            MergeRecords(existingData, charRecords, 2);
+            MergeRecords(existingData, lightRecords, 3);
+            MergeRecords(existingData, regularRecords, 1);
+            MergeRecords(existingData, bangbooRecords, 5);
 
             foreach (var pool in existingData.list)
             {
                 pool.records = pool.records.OrderByDescending(r => r.id).ToList();
             }
 
-            var serializedData = JsonConvert.SerializeObject(existingData, Formatting.Indented);
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping // 保留特殊字符
+            };
+            var serializedData = System.Text.Json.JsonSerializer.Serialize(existingData, options);
             await File.WriteAllTextAsync(filePath, serializedData);
 
             Logging.Write($"调频记录已保存到 {filePath}", 0);
         }
 
-        private static async Task MergeRecords(GachaData existingData, List<GachaRecords> newRecords, int cardPoolId)
+        private static void MergeRecords(GachaData existingData, List<GachaRecords> newRecords, int cardPoolId)
         {
             var pool = existingData.list.FirstOrDefault(p => p.cardPoolId == cardPoolId) ?? new GachaPool
             {
@@ -79,14 +96,30 @@ namespace ZenlessTools.Depend
 
             foreach (var newRecord in newRecords)
             {
-                if (!pool.records.Any(r => r.id == newRecord.Id))
+                // 转换新记录的时间格式
+                newRecord.Time = CorrectTimeFormat(newRecord.Time);
+
+                // 查找并更新记录
+                var existingRecord = pool.records.FirstOrDefault(r => r.id == newRecord.Id);
+                if (existingRecord != null)
+                {
+                    existingRecord.gachaType = newRecord.GachaType;
+                    existingRecord.itemId = newRecord.ItemId;
+                    existingRecord.count = newRecord.Count;
+                    existingRecord.time = newRecord.Time;
+                    existingRecord.name = newRecord.Name;
+                    existingRecord.lang = newRecord.Lang;
+                    existingRecord.itemType = newRecord.ItemType;
+                    existingRecord.rankType = newRecord.RankType;
+                }
+                else
                 {
                     pool.records.Add(new GachaRecord
                     {
                         gachaType = newRecord.GachaType,
                         itemId = newRecord.ItemId,
                         count = newRecord.Count,
-                        time = DateTime.Parse(newRecord.Time),
+                        time = newRecord.Time,
                         name = newRecord.Name,
                         lang = newRecord.Lang,
                         itemType = newRecord.ItemType,
@@ -97,6 +130,14 @@ namespace ZenlessTools.Depend
             }
         }
 
+        private static string CorrectTimeFormat(string time)
+        {
+            if (DateTime.TryParse(time, out DateTime parsedTime))
+            {
+                return parsedTime.ToString("yyyy-MM-dd HH:mm:ss");
+            }
+            return time;
+        }
 
         private static string GetCardPoolType(int cardPoolId)
         {
@@ -105,6 +146,7 @@ namespace ZenlessTools.Depend
                 2 => "独家频段",
                 3 => "音擎频段",
                 1 => "常驻频段",
+                5 => "邦布频段",
                 _ => "未知频段"
             };
         }
@@ -151,7 +193,7 @@ namespace ZenlessTools.Depend
                             GachaType = item["gacha_type"].ToString(),
                             ItemId = item["item_id"].ToString(),
                             Count = item["count"].ToString(),
-                            Time = item["time"].ToString(),
+                            Time = CorrectTimeFormat(item["time"].ToString()), // 确保时间格式正确
                             Name = item["name"].ToString(),
                             Lang = item["lang"].ToString(),
                             ItemType = item["item_type"].ToString(),

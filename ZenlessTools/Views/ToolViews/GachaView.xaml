@@ -17,7 +17,7 @@
         <StackPanel Grid.Row="0" HorizontalAlignment="Left">
             <StackPanel HorizontalAlignment="Stretch" Orientation="Horizontal">
                 <ToggleButton x:Name="ProxyButton" Content="启动代理" Click="ProxyButton_Click" Margin="0 0 0 8"/>
-                <Button x:Name="ImportZZGF" Click="ImportZZGF_Click" Margin="8 0 0 8" IsEnabled="False">
+                <Button x:Name="ImportUIGF" Click="ImportUIGF_Click" Margin="8 0 0 8">
                     <Button.Content>
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="导入记录"/>
@@ -25,7 +25,7 @@
                         </StackPanel>
                     </Button.Content>
                 </Button>
-                <Button x:Name="ExportZZGF" Click="ExportZZGF_Click" Margin="8 0 0 8" IsEnabled="False">
+                <Button x:Name="ExportUIGF" Click="ExportUIGF_Click" Margin="8 0 0 8">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="导出记录"/>
                         <TextBlock Text="[CN]" FontWeight="Bold"/>

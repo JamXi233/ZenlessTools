@@ -48,7 +48,7 @@ using System.Runtime.InteropServices;
 using Windows.Graphics;
 using Windows.Storage.Pickers;
 using WinRT.Interop;
-using WaveTools.Depend;
+using ZenlessTools.Depend;
 
 
 namespace ZenlessTools.Views.ToolViews
@@ -74,8 +74,6 @@ namespace ZenlessTools.Views.ToolViews
 
         BCCertMaker.BCCertMaker certProvider = new BCCertMaker.BCCertMaker();
         private DispatcherQueueTimer dispatcherTimer;
-        ApplicationDataContainer localSettings = ApplicationData.Current.LocalSettings;
-
 
         [DllImport("User32.dll")]
         public static extern short GetAsyncKeyState(int vKey);
@@ -387,7 +385,7 @@ namespace ZenlessTools.Views.ToolViews
         }
 
 
-        private async void ExportZZGF_Click(object sender, RoutedEventArgs e)
+        private async void ExportUIGF_Click(object sender, RoutedEventArgs e)
         {
             var window = new Window();
             string recordsBasePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), @"JSG-LLC\ZenlessTools\GachaRecords");
@@ -398,17 +396,16 @@ namespace ZenlessTools.Views.ToolViews
             InitializeWithWindow.Initialize(savePicker, hwnd);
 
             savePicker.SuggestedStartLocation = PickerLocationId.DocumentsLibrary;
-            savePicker.FileTypeChoices.Add("Wuthering Waves Gacha Format", new List<string>() { ".json" });
-            savePicker.SuggestedFileName = $"{selectedUid}_Export";
+            savePicker.FileTypeChoices.Add("Uniformed Interchangeable GachaLog Format standard v4.0", new List<string>() { ".json" });
+            savePicker.SuggestedFileName = $"ZenlessTools_Gacha_{selectedUid}_Export_UIGF4";
 
             StorageFile exportFile = await savePicker.PickSaveFileAsync();
             if (exportFile != null)
             {
-                ExportGacha.Export($"{recordsBasePath}\\{selectedUid}.json", exportFile.Path);
+                await ExportGacha.ExportAsync($"{recordsBasePath}\\{selectedUid}.json", exportFile.Path);
             }
         }
-
-        private async void ImportZZGF_Click(object sender, RoutedEventArgs e)
+        private async void ImportUIGF_Click(object sender, RoutedEventArgs e)
         {
             var window = new Window();
             // 打开文件选择器
@@ -424,7 +421,7 @@ namespace ZenlessTools.Views.ToolViews
             if (importFile != null)
             {
                 string recordsBasePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), @"JSG-LLC\ZenlessTools\GachaRecords");
-                //await ImportGacha.Import(importFile.Path);
+                await ImportGacha.Import(importFile.Path);
             }
             ReloadGachaView();
         }

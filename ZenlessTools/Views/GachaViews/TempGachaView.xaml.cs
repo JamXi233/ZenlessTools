@@ -330,8 +330,6 @@ namespace ZenlessTools.Views.GachaViews
             Logging.Write("Finished displaying gacha details", 0);
         }
 
-
-
         private Border CreateDetailBorder()
         {
             return new Border

@@ -114,10 +114,14 @@ namespace ZenlessTools.Depend
                         break;
                 }
                 AnsiConsole.Write(new Markup(markupText));
-                if (info.Contains("\n"))
+                if (info != null)
                 {
-                    info = info.Replace("\n", ",");
+                    if (info.Contains("\n"))
+                    {
+                        info = info.Replace("\n", ",");
+                    }
                 }
+                
                 Console.WriteLine(info);
                 logMessage += info;
 
