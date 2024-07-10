@@ -30,7 +30,7 @@ namespace ZenlessTools.Depend
     public class InstallerHelper
     {
         private static readonly string BaseInstallerPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "JSG-LLC", "ZenlessTools", "Installer");
-        private static readonly string InstallerFileName = "ZenlessToolsInstaller_1.0.0.0.exe";
+        private static readonly string InstallerFileName = "ZenlessToolsInstaller.exe";
         private static readonly string InstallerFullPath = Path.Combine(BaseInstallerPath, InstallerFileName);
         private static readonly string InstallerInfoUrl = "https://api.jamsg.cn/release/getversion?package=cn.jamsg.ZenlessToolsinstaller";
 

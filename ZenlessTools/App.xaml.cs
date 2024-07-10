@@ -52,13 +52,14 @@ namespace ZenlessTools
         public App()
         {
             InitializeComponent();
+            Init();
             InitAppData();
             SetupTheme();
+            InitAdminMode();
         }
 
         protected override async void OnLaunched(LaunchActivatedEventArgs args)
         {
-            await InitAsync();
             if (AppDataController.GetTerminalMode() == -1 || AppDataController.GetTerminalMode() == 0)
             {
                 m_window = new MainWindow();
@@ -74,6 +75,14 @@ namespace ZenlessTools
             {
                 AppDataController appDataController = new AppDataController();
                 appDataController.FirstRunInit();
+            }
+        }
+
+        private void InitAdminMode()
+        {
+            if (AppDataController.GetAdminMode() == 1)
+            {
+                if (!ProcessRun.IsRunAsAdmin()) ProcessRun.RequestAdminAndRestart();
             }
         }
 
@@ -111,7 +120,7 @@ namespace ZenlessTools
             }
         }
 
-        public async Task InitAsync()
+        public void Init()
         {
             AllocConsole();
             Console.OutputEncoding = Encoding.UTF8;

@@ -95,6 +95,7 @@ namespace ZenlessTools
             this.Activated -= MainWindow_Activated;
             await InitializeAppDataAsync();
             await BackgroundImageAsync();
+            InitStatus();
             CleanUpdate();
             if (AppDataController.GetAutoCheckUpdate() == 1)
             {
@@ -349,6 +350,20 @@ namespace ZenlessTools
                 backgroundImage.UriSource = new Uri(backgroundUrl);
                 Background.ImageSource = backgroundImage;
             }
+        }
+
+        private void InitStatus()
+        {
+            if (AppDataController.GetAdminMode() == 1)
+            {
+                if (!ProcessRun.IsRunAsAdmin())
+                {
+                    NotificationManager.RaiseNotification("获取管理员权限时出现问题", "您在设置中开启了\n[使用管理员身份运行]\n\n但SRTools并没有正确获取到管理员权限", InfoBarSeverity.Warning);
+                    AppTitleBar_Status.Text = "Refusal";
+                }
+                else AppTitleBar_Status.Text = "Privileged";
+            }
+            if (Debugger.IsAttached || App.SDebugMode) AppTitleBar_Status.Text = "Debugging";
         }
 
         private void NavView_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)

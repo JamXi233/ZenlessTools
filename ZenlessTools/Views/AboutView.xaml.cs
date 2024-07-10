@@ -77,6 +77,7 @@ namespace ZenlessTools.Views
             consoleToggle.IsChecked = AppDataController.GetConsoleMode() == 1;
             terminalToggle.IsChecked = AppDataController.GetTerminalMode() == 1;
             autoCheckUpdateToggle.IsChecked = AppDataController.GetAutoCheckUpdate() == 1;
+            adminModeToggle.IsChecked = AppDataController.GetAdminMode() == 1;
             userviceRadio.SelectedIndex = AppDataController.GetUpdateService() == 0 ? 1 : AppDataController.GetUpdateService() == 2 ? 0 : -1;
             themeRadio.SelectedIndex = AppDataController.GetDayNight();
         }
@@ -115,6 +116,11 @@ namespace ZenlessTools.Views
         private void Auto_Check_Update_Toggle(object sender, RoutedEventArgs e)
         {
             AppDataController.SetAutoCheckUpdate(autoCheckUpdateToggle.IsChecked == true ? 1 : 0);
+        }
+
+        private void Admin_Mode_Toggle(object sender, RoutedEventArgs e)
+        {
+            AppDataController.SetAdminMode(adminModeToggle.IsChecked == true ? 1 : 0);
         }
 
         public void Clear_AllData_TipShow(object sender, RoutedEventArgs e)

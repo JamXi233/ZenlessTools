@@ -36,6 +36,7 @@ namespace ZenlessTools.Depend
             SetDefaultIfNull("Config_FirstRunStatus", 0);
             SetDefaultIfNull("Config_ConsoleMode", 0);
             SetDefaultIfNull("Config_TerminalMode", 0);
+            SetDefaultIfNull("Config_AdminMode", 0);
         }
 
         public int CheckOldData()
@@ -100,6 +101,7 @@ namespace ZenlessTools.Depend
         public static int GetDayNight() => GetValue("Config_DayNight", -1);
         public static int GetConsoleMode() => GetValue("Config_ConsoleMode", -1);
         public static int GetTerminalMode() => GetValue("Config_TerminalMode", -1);
+        public static int GetAdminMode() => GetValue("Config_AdminMode", -1);
 
         public static void SetAutoCheckUpdate(int autocheckupdate) => SetValue("Config_AutoCheckUpdate", autocheckupdate);
         public static void SetFirstRunStatus(int firstRunStatus) => SetValue("Config_FirstRunStatus", firstRunStatus);
@@ -109,6 +111,7 @@ namespace ZenlessTools.Depend
         public static void SetDayNight(int dayNight) => SetValue("Config_DayNight", dayNight);
         public static void SetConsoleMode(int consoleMode) => SetValue("Config_ConsoleMode", consoleMode);
         public static void SetTerminalMode(int terminalMode) => SetValue("Config_TerminalMode", terminalMode);
+        public static void SetAdminMode(int adminMode) => SetValue("Config_AdminMode", adminMode);
 
         public static void RMAutoCheckUpdate() => RemoveValue("Config_AutoCheckUpdate");
         public static void RMFirstRunStatus() => RemoveValue("Config_FirstRunStatus");
@@ -117,6 +120,8 @@ namespace ZenlessTools.Depend
         public static void RMUpdateService() => RemoveValue("Config_UpdateService");
         public static void RMDayNight() => RemoveValue("Config_DayNight");
         public static void RMConsoleMode() => RemoveValue("Config_ConsoleMode");
-        public static void RMTerminalMode() => RemoveValue("Config_TerminalMode");
+        public static void RMTerminalMode() => RemoveValue("Config_TerminalMode"); 
+        public static void RMAdminMode() => RemoveValue("Config_AdminMode");
+
     }
 }
