@@ -27,7 +27,7 @@ namespace ZenlessTools.Depend
             {
                 if (GameUpdateModel.LatestVersion != localGameVersion)
                 {
-                    if (!DownloadManager.isDownloading)
+                    if (!DownloadHelpers.isDownloading)
                     {
                         Logging.Write("发现新版本游戏，请更新.");
                         NotificationManager.RaiseNotification("发现新版本游戏", "当前版本:" + localGameVersion + "\n最新版本:" + GameUpdateModel.LatestVersion + "\n请及时更新游戏本体", InfoBarSeverity.Warning, true, 3);
@@ -181,8 +181,8 @@ namespace ZenlessTools.Depend
 
         public static async Task<bool> StartDownload(Action<double, string, string> progressChanged)
         {
-            DownloadManager.isDownloading = true;
-            DownloadManager.isPaused = false;
+            DownloadHelpers.isDownloading = true;
+            DownloadHelpers.isPaused = false;
             string downloadUrl = GameUpdateModel.DiffsPath ?? GameUpdateModel.LatestPath;
             string filePath = AppDataController.GetGamePathWithoutGameName() + "game.zip";
             Stopwatch stopwatch = new Stopwatch();
@@ -248,7 +248,7 @@ namespace ZenlessTools.Depend
                                     {
                                         var percentage = (double)totalRead / totalBytes * 100;
                                         progressChanged?.Invoke(percentage, $"{speedMb:F2}MB/s", $"{sizeMb:F2}MB/{totalSizeMb:F2}MB");
-                                        DownloadManager.UpdateProgress(percentage, $"{speedMb:F2}MB/s", $"{sizeMb:F2}MB/{totalSizeMb:F2}MB");
+                                        DownloadHelpers.UpdateProgress(percentage, $"{speedMb:F2}MB/s", $"{sizeMb:F2}MB/{totalSizeMb:F2}MB");
                                         lastUpdateTime = DateTime.Now;
                                     }
                                 }
@@ -272,8 +272,8 @@ namespace ZenlessTools.Depend
         public static void PauseDownload()
         {
             cancellationTokenSource?.Cancel();
-            DownloadManager.isDownloading = true;
-            DownloadManager.isPaused = true;
+            DownloadHelpers.isDownloading = true;
+            DownloadHelpers.isPaused = true;
         }
 
         public static void ResumeDownload(Action<double, string, string> progressChanged)
@@ -288,7 +288,7 @@ namespace ZenlessTools.Depend
             try
             {
                 NotificationManager.RaiseNotification("下载完成", "", InfoBarSeverity.Success, true, 2);
-                DownloadManager.isPaused = true;
+                DownloadHelpers.isPaused = true;
                 var progress = new Progress<int>(async percent =>
                 {
                     WaitOverlayManager.RaiseWaitOverlay(true, "正在校验MD5", "请稍等", true, percent);
@@ -318,8 +318,8 @@ namespace ZenlessTools.Depend
                 NotificationManager.RaiseNotification("更新完成", $"游戏已更新到{GameUpdateModel.LatestVersion}。", InfoBarSeverity.Success, true, 2);
 
                 // 重置下载管理器的变量
-                ResetDownloadManagerVariables();
-                DownloadManager.isDownloading = false;
+                ResetDownloadHelpersVariables();
+                DownloadHelpers.isDownloading = false;
                 
                 return true;
             }
@@ -429,14 +429,14 @@ namespace ZenlessTools.Depend
             }
         }
 
-        private static void ResetDownloadManagerVariables()
+        private static void ResetDownloadHelpersVariables()
         {
-            DownloadManager.CurrentProgress = 0;
-            DownloadManager.CurrentSpeed = string.Empty;
-            DownloadManager.CurrentSize = string.Empty;
-            DownloadManager.isDownloading = false;
-            DownloadManager.isPaused = true;
-            DownloadManager.isFinished = false;
+            DownloadHelpers.CurrentProgress = 0;
+            DownloadHelpers.CurrentSpeed = string.Empty;
+            DownloadHelpers.CurrentSize = string.Empty;
+            DownloadHelpers.isDownloading = false;
+            DownloadHelpers.isPaused = true;
+            DownloadHelpers.isFinished = false;
         }
     }
 }

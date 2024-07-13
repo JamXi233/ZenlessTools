@@ -74,7 +74,7 @@ namespace ZenlessTools.Views.SGViews
                 currentAccount.IsEnabled = true;
             }
 
-            if (!accountexist && CurrentLoginUID != "0" && CurrentLoginUID != "目前未登录ID")
+            if (!accountexist && CurrentLoginUID != "0" && CurrentLoginUID != "当前未登录账号")
             {
                 Account newAccount = new Account { uid = CurrentLoginUID, name = "未保存"};
                 accounts.Add(newAccount);
@@ -162,12 +162,11 @@ namespace ZenlessTools.Views.SGViews
                     {
                         var result = fileName.Substring(prefix.Length);
                         Logging.Write($"Found latest accessed file: {result}", 0);
-                        if (await ProcessRun.ZenlessToolsHelperAsync("/GetCurrentLogin") == "false") return "当前未登录账号";
+                        if (await ProcessRun.ZenlessToolsHelperAsync($"/GetCurrentLogin {StartGameView.GameRegion}") == "false") return "当前未登录账号";
                         return result;
                     }
                 }
             }
-
             Logging.Write("No valid files found. Returning 0", 0);
             return "0";
         }
@@ -257,9 +256,8 @@ namespace ZenlessTools.Views.SGViews
         {
             saveAccountName.IsOpen = false;
             var result = await ProcessRun.ZenlessToolsHelperAsync($"/BackupUser {StartGameView.GameRegion} " + await GetCurrentLogin() + " " + saveAccountNameInput.Text);
-            NotificationManager.RaiseNotification("保存账户成功", result, InfoBarSeverity.Success, false, 3);
-            saveAccountSuccess.Subtitle = result;
-            saveAccountSuccess.IsOpen = true;
+            if (result.Length > 0) NotificationManager.RaiseNotification("保存账户失败", result, InfoBarSeverity.Error, false, 3);
+            else NotificationManager.RaiseNotification("保存账户成功", result, InfoBarSeverity.Success, false, 3);
             renameAccount.IsEnabled = true;
             saveAccount.IsEnabled = true;
             saveAccountNameInput.Text = "";

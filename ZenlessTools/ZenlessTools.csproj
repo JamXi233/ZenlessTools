@@ -56,6 +56,7 @@
     <None Remove="Views\BlankPage1.xaml" />
     <None Remove="Views\Dialog.xaml" />
     <None Remove="Views\GachaView.xaml.cs.bak" />
+    <None Remove="Views\GachaViews\ScreenShotGacha.xaml" />
     <None Remove="Views\NotifyViews\BannerView.xaml" />
   </ItemGroup>
 
@@ -129,6 +130,9 @@
       <XamlRuntime>$(DefaultXamlRuntime)</XamlRuntime>
     </Page>
     <Page Update="Views\FlarumView.xaml">
+      <XamlRuntime>$(DefaultXamlRuntime)</XamlRuntime>
+    </Page>
+    <Page Update="Views\GachaViews\ScreenShotGacha.xaml">
       <XamlRuntime>$(DefaultXamlRuntime)</XamlRuntime>
     </Page>
     <Page Update="Views\NotifyViews\BannerView.xaml">

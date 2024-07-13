@@ -12,6 +12,8 @@ using System.Threading.Tasks;
 using static ZenlessTools.App;
 using Windows.Foundation;
 using Microsoft.UI.Xaml.Navigation;
+using System.IO;
+using System.Runtime.InteropServices;
 
 namespace ZenlessTools.Views
 {
@@ -21,6 +23,10 @@ namespace ZenlessTools.Views
         private DispatcherQueue dispatcherQueue;
         private DispatcherQueueTimer dispatcherTimer_Game;
         public static string GS = null;
+        public static bool isUserTap = true;
+
+        [DllImport("User32.dll")]
+        public static extern short GetAsyncKeyState(int vKey);
 
         public StartGameView()
         {
@@ -40,7 +46,7 @@ namespace ZenlessTools.Views
 
         private void InitializeTimers()
         {
-            DownloadManager.DownloadProgressChanged += UpdateProgressChanged;
+            DownloadHelpers.DownloadProgressChanged += UpdateProgressChanged;
             dispatcherTimer_Game = CreateTimer(TimeSpan.FromSeconds(0.2), CheckProcess_Game);
             dispatcherTimer_Game.Start();
         }
@@ -76,19 +82,22 @@ namespace ZenlessTools.Views
                     UpdateUIElementsVisibility(1);
                     if (mode == null)
                     {
+                        InitializeComboBoxSelection();
                         CheckProcess_Account();
                         CheckProcess_Graphics();
                     }
                     else if (mode == "Graphics") CheckProcess_Graphics();
                     else if (mode == "Account") CheckProcess_Account();
                     // 检查游戏更新
-                    if (GameRegion == "CN") 
+                    // 检查游戏更新
+                    if (GameRegion == "CN" || GameRegion == "Bili")
                     {
+                        serverSelect.Visibility = Visibility.Visible;
                         await GameUpdate.ExtractGameInfo();
                         bool isGameUpdateRequire = await GameUpdate.CheckAndUpdateGame();
                         if (isGameUpdateRequire)
                         {
-                            if (DownloadManager.isPaused) startUpdate.Visibility = Visibility.Visible;
+                            if (DownloadHelpers.isPaused) startUpdate.Visibility = Visibility.Visible;
                             else updateRunning.Visibility = Visibility.Visible;
                         }
                         else
@@ -96,8 +105,15 @@ namespace ZenlessTools.Views
                             startGame.Visibility = Visibility.Visible;
                             updateRunning.Visibility = Visibility.Collapsed;
                         }
+                        if (GameRegion == "Bili")
+                        {
+                            Frame_AccountView_Disable.Visibility = Visibility.Visible;
+                            Frame_AccountView_Disable_Title.Text = "B服暂不支持账号切换";
+                            Frame_AccountView_Disable_Subtitle.Text = "将于之后的版本推出";
+                        }
+                        else Frame_AccountView_Disable.Visibility = Visibility.Collapsed;
                     }
-                    
+
                 }
             }
             else
@@ -106,24 +122,116 @@ namespace ZenlessTools.Views
             }
         }
 
+        private void InitializeComboBoxSelection()
+        {
+            isUserTap = false;
+            string gamePath = AppDataController.GetGamePathWithoutGameName();
+            string configFilePath = Path.Combine(gamePath, "config.ini");
+
+            if (File.Exists(configFilePath))
+            {
+                string[] configLines = File.ReadAllLines(configFilePath);
+                string channel = null;
+                string cps = null;
+                string subChannel = null;
+
+                foreach (var line in configLines)
+                {
+                    if (line.StartsWith("channel="))
+                    {
+                        channel = line.Split('=')[1];
+                    }
+                    else if (line.StartsWith("sub_channel="))
+                    {
+                        subChannel = line.Split('=')[1];
+                    }
+                }
+
+                if (channel == "1" && subChannel == "1")
+                {
+                    serverSelect.SelectedIndex = 0; // 官服
+                }
+                else if (channel == "14" && subChannel == "0")
+                {
+                    serverSelect.SelectedIndex = 1; // B服
+                }
+            }
+            isUserTap = true;
+        }
+
+        private void ServerSelect_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            bool isShiftPressed = (GetAsyncKeyState(0x10) & 0x8000) != 0;
+            if (!isUserTap) return;
+            if (serverSelect.SelectedItem is ComboBoxItem selectedItem)
+            {
+                string extrasPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "JSG-LLC", "ZenlessTools", "Extras", "ServerChange");
+                string dllFilePath = Path.Combine(extrasPath, "PCGameSDK.dll");
+                string extrasurl = "https://ds.jamsg.cn/d/Release/ZenlessTools/Extras/PCGameSDK.zip";
+                if (isShiftPressed) DialogManager.RaiseDialog(XamlRoot, "遇到问题了？", "重新额外的文件", true, "下载", async () => await DownloadHelpers.DownloadAndExtractZipFileAsync(extrasurl, extrasPath, true, extrasPath));
+                if (File.Exists(dllFilePath))
+                {
+                    string gamePath = AppDataController.GetGamePathWithoutGameName();
+                    string configFilePath = Path.Combine(gamePath, "config.ini");
+                    string[] configLines = File.ReadAllLines(configFilePath);
+
+                    if (selectedItem.Content.ToString() == "官服")
+                    {
+                        UpdateConfig(configLines, "1", "1");
+                        NotificationManager.RaiseNotification("切换服务器完成", "已切换到官服", InfoBarSeverity.Success, false, 1);
+                    }
+                    else if (selectedItem.Content.ToString() == "B服")
+                    {
+                        UpdateConfig(configLines, "14", "0");
+                        CopyDllToPluginsFolder(dllFilePath, gamePath);
+                        NotificationManager.RaiseNotification("切换服务器完成", "已切换到B服", InfoBarSeverity.Success, false, 1);
+                    }
+
+                    File.WriteAllLines(configFilePath, configLines);
+                    LoadDataAsync();
+                }
+                else
+                {
+                    ReloadFrame(null, null);
+                    DialogManager.RaiseDialog(XamlRoot, "未找到Extra文件", "您需要下载额外的文件来使用服务器切换", true, "下载", async () => await DownloadHelpers.DownloadAndExtractZipFileAsync(extrasurl, extrasPath, true, extrasPath));
+                }
+            }
+        }
+
+        private void UpdateConfig(string[] configLines, string channel, string subChannel)
+        {
+            for (int i = 0; i < configLines.Length; i++)
+            {
+                if (configLines[i].StartsWith("channel="))
+                {
+                    configLines[i] = $"channel={channel}";
+                }
+                else if (configLines[i].StartsWith("sub_channel="))
+                {
+                    configLines[i] = $"sub_channel={subChannel}";
+                }
+            }
+        }
+
+        private void CopyDllToPluginsFolder(string sourceDllPath, string gamePath)
+        {
+            string pluginsPath = Path.Combine(gamePath, "ZenlessZoneZero_Data", "Plugins");
+            Directory.CreateDirectory(pluginsPath);
+            string destinationDllPath = Path.Combine(pluginsPath, "PCGameSDK.dll");
+
+            File.Copy(sourceDllPath, destinationDllPath, true);
+        }
+
         private async void SelectGame(object sender, RoutedEventArgs e)
         {
-            var picker = new FileOpenPicker();
-            picker.FileTypeFilter.Add(".exe");
-            var window = new Window();
-            var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(window);
-            WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
             await AnsiConsole.Status().StartAsync("等待选择文件...", async ctx =>
             {
-                var file = await picker.PickSingleFileAsync();
-                if (file != null && file.Name == "ZenlessZoneZero.exe")
+                string filePath = await CommonHelpers.FileHelpers.OpenFile(".exe");
+                if (filePath != null && filePath.Contains("ZenlessZoneZero.exe"))
                 {
+                    AppDataController.SetGamePath(filePath);
                     LoadDataAsync();
-                    AppDataController.SetGamePath(@file.Path);
                     await Depend.Region.GetRegion(true);
-                    UpdateUIElementsVisibility(1);
-                    CheckProcess_Graphics();
-                    CheckProcess_Account();
                 }
                 else
                 {
@@ -136,7 +244,7 @@ namespace ZenlessTools.Views
         public void RMGameLocation(object sender, RoutedEventArgs e)
         {
             AppDataController.RMGamePath();
-            UpdateUIElementsVisibility(0);
+            LoadDataAsync();
         }
 
         private void ReloadFrame(object sender, RoutedEventArgs e)
@@ -157,11 +265,11 @@ namespace ZenlessTools.Views
         private async void StartUpdate_Click(object sender, RoutedEventArgs e)
         {
             bool updateSuccessful = false;
-            if (DownloadManager.isDownloading)
+            if (DownloadHelpers.isDownloading)
             {
                 updateSuccessful = await GameUpdate.StartDownload(UpdateProgressChanged);
             }
-            else if (DownloadManager.isPaused)
+            else if (DownloadHelpers.isPaused)
             {
                 GameUpdate.ResumeDownload(UpdateProgressChanged);
             }
@@ -187,9 +295,9 @@ namespace ZenlessTools.Views
 
         private async Task CheckDownloadStatus()
         {
-            while (DownloadManager.isDownloading)
+            while (DownloadHelpers.isDownloading)
             {
-                if (!DownloadManager.isPaused)
+                if (!DownloadHelpers.isPaused)
                 {
                     startUpdate.Visibility = Visibility.Collapsed;
                     updateRunning.Visibility = Visibility.Visible;
@@ -202,9 +310,9 @@ namespace ZenlessTools.Views
                 await Task.Delay(100);
             }
 
-            if (!DownloadManager.isDownloading)
+            if (!DownloadHelpers.isDownloading)
             {
-                DownloadManager.DownloadProgressChanged -= UpdateProgressChanged;
+                DownloadHelpers.DownloadProgressChanged -= UpdateProgressChanged;
                 startUpdate.Visibility = Visibility.Collapsed;
                 updateRunning.Visibility = Visibility.Collapsed;
                 startGame.Visibility = Visibility.Visible;
@@ -347,18 +455,18 @@ namespace ZenlessTools.Views
         private void OnUnloaded(object sender, RoutedEventArgs e)
         {
             dispatcherTimer_Game.Stop();
-            DownloadManager.DownloadProgressChanged -= UpdateProgressChanged;
+            DownloadHelpers.DownloadProgressChanged -= UpdateProgressChanged;
             Logging.Write("Timer Stopped", 0);
         }
 
         protected override void OnNavigatedTo(NavigationEventArgs e)
         {
-            if(DownloadManager.isDownloading == true) UpdateProgressChanged(DownloadManager.CurrentProgress, DownloadManager.CurrentSpeed, DownloadManager.CurrentSize);
+            if(DownloadHelpers.isDownloading == true) UpdateProgressChanged(DownloadHelpers.CurrentProgress, DownloadHelpers.CurrentSpeed, DownloadHelpers.CurrentSize);
         }
 
         protected override void OnNavigatedFrom(NavigationEventArgs e)
         {
-            DownloadManager.DownloadProgressChanged -= UpdateProgressChanged;
+            DownloadHelpers.DownloadProgressChanged -= UpdateProgressChanged;
         }
     }
 }

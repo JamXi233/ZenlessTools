@@ -40,6 +40,7 @@ using static ZenlessTools.App;
 using System.Diagnostics;
 using Microsoft.UI.Xaml.Media.Animation;
 using Microsoft.UI.Xaml.Media;
+using Windows.ApplicationModel;
 
 namespace ZenlessTools
 {
@@ -53,6 +54,11 @@ namespace ZenlessTools
         string ExpectionFileName;
         string backgroundUrl = "";
 
+
+        private const int GWL_STYLE = -16;
+        private const int WS_MAXIMIZEBOX = 0x00010000;
+        private const int WM_NCLBUTTONDBLCLK = 0x00A3;
+
         // 导入 AllocConsole 和 FreeConsole 函数
         [DllImport("kernel32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
@@ -64,6 +70,37 @@ namespace ZenlessTools
         // 导入 GetAsyncKeyState 函数
         [DllImport("User32.dll")]
         public static extern short GetAsyncKeyState(int vKey);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetActiveWindow();
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr CallWindowProc(IntPtr lpPrevWndFunc, IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
+
+        private delegate IntPtr WndProcDelegate(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
+        private WndProcDelegate newWndProc;
+        private IntPtr oldWndProc;
+
+
+        private IntPtr CustomWndProc(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam)
+        {
+            if (msg == WM_NCLBUTTONDBLCLK)
+            {
+                // 阻止双击标题栏最大化
+                return IntPtr.Zero;
+            }
+            return CallWindowProc(oldWndProc, hWnd, msg, wParam, lParam);
+        }
+
 
         public NavigationView NavigationView { get; }
 
@@ -244,6 +281,12 @@ namespace ZenlessTools
                 presenter.IsMaximizable = false;
             }
 
+            int style = GetWindowLong(hwnd, GWL_STYLE);
+            SetWindowLong(hwnd, GWL_STYLE, style & ~WS_MAXIMIZEBOX);
+
+            newWndProc = new WndProcDelegate(CustomWndProc);
+            oldWndProc = SetWindowLongPtr(hwnd, -4, Marshal.GetFunctionPointerForDelegate(newWndProc));
+
             float scale = (float)User32.GetDpiForWindow(hwnd) / 96;
 
             int windowWidth = (int)(1024 * scale);
@@ -258,6 +301,8 @@ namespace ZenlessTools
                 titleBar.ExtendsContentIntoTitleBar = true;
                 titleBar.ButtonBackgroundColor = Colors.Transparent;
                 titleBar.ButtonInactiveBackgroundColor = Colors.Transparent;
+                titleBar.IconShowOptions = IconShowOptions.ShowIconAndSystemMenu;
+                titleBar.PreferredHeightOption = (TitleBarHeightOption)1;
 
                 if (AppDataController.GetDayNight() == 0)
                 {
@@ -354,16 +399,20 @@ namespace ZenlessTools
 
         private void InitStatus()
         {
+            PackageVersion packageVersion = Package.Current.Id.Version;
+            string currentVersion = $"{packageVersion.Major}.{packageVersion.Minor}.{packageVersion.Build}.{packageVersion.Revision}";
+            AppTitleBar_Status.Visibility = Visibility.Visible;
             if (AppDataController.GetAdminMode() == 1)
             {
                 if (!ProcessRun.IsRunAsAdmin())
                 {
-                    NotificationManager.RaiseNotification("获取管理员权限时出现问题", "您在设置中开启了\n[使用管理员身份运行]\n\n但SRTools并没有正确获取到管理员权限", InfoBarSeverity.Warning);
+                    NotificationManager.RaiseNotification("获取管理员权限时出现问题", "您在设置中开启了\n[使用管理员身份运行]\n\n但ZenlessTools并没有正确获取到管理员权限", InfoBarSeverity.Warning);
                     AppTitleBar_Status.Text = "Refusal";
                 }
                 else AppTitleBar_Status.Text = "Privileged";
             }
             if (Debugger.IsAttached || App.SDebugMode) AppTitleBar_Status.Text = "Debugging";
+            else AppTitleBar_Status.Text = currentVersion;
         }
 
         private void NavView_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
@@ -442,6 +491,46 @@ namespace ZenlessTools
         private const int ThrottleTimeMilliseconds = 50;
         public async void AddNotification(string title, string message, InfoBarSeverity severity, bool isClosable = true, int TimerSec = 0, Action actionButtonAction = null, string actionButtonText = null)
         {
+            double maxLength = 30;
+            if (isClosable) maxLength = 25;
+
+            if(message != null)
+            {
+                double currentLength = 0;
+                for (int i = 0; i < message.Length; i++)
+                {
+                    if (message[i] == '\n')
+                    {
+                        currentLength = 0; // 遇到换行符重置计数
+                        continue;
+                    }
+
+                    if (char.IsDigit(message[i]) || (message[i] >= 'a' && message[i] <= 'z') || (message[i] >= 'A' && message[i] <= 'Z') || char.IsWhiteSpace(message[i]))
+                    {
+                        currentLength += 1; // 数字、字母和空格算一个字符
+                    }
+                    else if (char.IsPunctuation(message[i]) || char.IsSymbol(message[i]))
+                    {
+                        currentLength += 1; // 符号算0.5个字符
+                    }
+                    else if (message[i] >= 0x4e00 && message[i] <= 0x9fff)
+                    {
+                        currentLength += 2;
+                    }
+                    else
+                    {
+                        currentLength += 1; // 其他字符算一个字符
+                    }
+
+                    if (currentLength >= maxLength)
+                    {
+                        message = message.Insert(i + 1, "\n");
+                        currentLength = 0;
+                        i++; // 插入后，跳过刚插入的 \n
+                    }
+                }
+            }
+
             DateTime currentTime = DateTime.Now;
             if ((currentTime - lastNotificationTime).TotalMilliseconds < ThrottleTimeMilliseconds)
             {
@@ -667,7 +756,7 @@ namespace ZenlessTools
             buttonAction?.Invoke();
         }
 
-        private async void ShowDialog(XamlRoot xamlRoot, string title = null, string content = null, bool isPrimaryButtonEnabled = false, string primaryButtonContent = "", Action primaryButtonAction = null, bool isSecondaryButtonEnabled = false, string secondaryButtonContent = "", Action secondaryButtonAction = null)
+        private async void ShowDialog(XamlRoot xamlRoot, string title = null, object content = null, bool isPrimaryButtonEnabled = false, string primaryButtonContent = "", Action primaryButtonAction = null, bool isSecondaryButtonEnabled = false, string secondaryButtonContent = "", Action secondaryButtonAction = null)
         {
             if (isDialogOpen)
             {
@@ -675,6 +764,12 @@ namespace ZenlessTools
             }
 
             isDialogOpen = true;
+
+            // 如果 content 是 string 类型，创建一个 TextBlock 包装它
+            if (content is string textContent)
+            {
+                content = new TextBlock { Text = textContent, FontSize = 14, TextWrapping = TextWrapping.Wrap };
+            }
 
             ContentDialog dialog = new ContentDialog
             {
@@ -685,7 +780,7 @@ namespace ZenlessTools
                 SecondaryButtonText = isSecondaryButtonEnabled ? secondaryButtonContent : null,
                 CloseButtonText = "关闭",
                 DefaultButton = ContentDialogButton.Primary,
-                Content = new TextBlock { Text = content, FontSize = 14 }
+                Content = content
             };
 
             if (isPrimaryButtonEnabled)

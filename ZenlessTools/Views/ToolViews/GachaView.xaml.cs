@@ -48,6 +48,10 @@ using System.Runtime.InteropServices;
 using Windows.Graphics;
 using Windows.Storage.Pickers;
 using WinRT.Interop;
+using Microsoft.UI.Xaml.Media.Imaging;
+using Windows.Graphics.Imaging;
+using Windows.Storage.Streams;
+using Microsoft.UI.Windowing;
 
 
 namespace ZenlessTools.Views.ToolViews
@@ -196,6 +200,7 @@ namespace ZenlessTools.Views.ToolViews
                 LoadGachaRecords(selectedUid);
             }
             ClearGacha.IsEnabled = !string.IsNullOrEmpty(selectedUid);
+            CreateCapture.IsEnabled = !string.IsNullOrEmpty(selectedUid);
 
             loadGachaProgress.Visibility = Visibility.Collapsed;
             noGachaFound.Visibility = Visibility.Collapsed;
@@ -225,6 +230,7 @@ namespace ZenlessTools.Views.ToolViews
                     loadGachaProgress.Visibility = Visibility.Collapsed;
                     noGachaFound.Visibility = Visibility.Visible;
                     ExportUIGF.IsEnabled = false;
+                    CreateCapture.IsEnabled = false;
                     return;
                 }
 
@@ -237,6 +243,7 @@ namespace ZenlessTools.Views.ToolViews
                     gachaView.Visibility = Visibility.Visible;
                     ExportUIGF.IsEnabled = true;
                     ClearGacha.IsEnabled = true;
+                    CreateCapture.IsEnabled = true;
                 }
             }
             catch (Exception ex)
@@ -388,41 +395,31 @@ namespace ZenlessTools.Views.ToolViews
 
         private async void ExportUIGF_Click(object sender, RoutedEventArgs e)
         {
-            var window = new Window();
-            string recordsBasePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), @"JSG-LLC\ZenlessTools\GachaRecords");
+            string recordsBasePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), @"JSG-LLC\SRTools\GachaRecords");
+            DateTime now = DateTime.Now;
+            string formattedDate = now.ToString("yyyy_MM_dd_HH_mm_ss");
 
-            // 打开文件选择器
-            var savePicker = new FileSavePicker();
-            var hwnd = WindowNative.GetWindowHandle(window);
-            InitializeWithWindow.Initialize(savePicker, hwnd);
-
-            savePicker.SuggestedStartLocation = PickerLocationId.DocumentsLibrary;
-            savePicker.FileTypeChoices.Add("Uniformed Interchangeable GachaLog Format standard v4.0", new List<string>() { ".json" });
-            savePicker.SuggestedFileName = $"ZenlessTools_Gacha_{selectedUid}_Export_UIGF4";
-
-            StorageFile exportFile = await savePicker.PickSaveFileAsync();
-            if (exportFile != null)
+            var suggestFileName = $"ZenlessTools_Gacha_Export_{selectedUid}_{formattedDate}_UIGF4";
+            var fileTypeChoices = new Dictionary<string, List<string>>
             {
-                await ExportGacha.ExportAsync($"{recordsBasePath}\\{selectedUid}.json", exportFile.Path);
+                { "Uniformed Interchangeable GachaLog Format standard v4.0", new List<string> { ".json" } }
+            };
+            var defaultExtension = ".json";
+
+            string filePath = await CommonHelpers.FileHelpers.SaveFile(suggestFileName, fileTypeChoices, defaultExtension);
+            if (filePath != null)
+            {
+                await ExportGacha.ExportAsync($"{recordsBasePath}\\{selectedUid}.json", filePath);
             }
         }
+
         private async void ImportUIGF_Click(object sender, RoutedEventArgs e)
         {
-            var window = new Window();
-            // 打开文件选择器
-            var openPicker = new FileOpenPicker();
-            var hwnd = WindowNative.GetWindowHandle(window);
-            InitializeWithWindow.Initialize(openPicker, hwnd);
+            string filePath = await CommonHelpers.FileHelpers.OpenFile(".json");
 
-            openPicker.ViewMode = PickerViewMode.Thumbnail;
-            openPicker.SuggestedStartLocation = PickerLocationId.DocumentsLibrary;
-            openPicker.FileTypeFilter.Add(".json");
-
-            StorageFile importFile = await openPicker.PickSingleFileAsync();
-            if (importFile != null)
+            if (filePath != null)
             {
-                string recordsBasePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), @"JSG-LLC\ZenlessTools\GachaRecords");
-                await ImportGacha.Import(importFile.Path);
+                await ImportGacha.Import(filePath);
             }
             ReloadGachaView();
         }
@@ -607,6 +604,87 @@ namespace ZenlessTools.Views.ToolViews
             else
             {
                 ProxyButton.IsChecked = false;
+            }
+        }
+
+        public async void CreateCapture_Click(object sender, RoutedEventArgs e)
+        {
+            // 创建对话框内容
+            var content = new StackPanel { Spacing = 4 }; // 设置 StackPanel 的 Spacing 为 4
+
+            var checkBoxScreenShotSelf = new CheckBox { Content = "是否自动截图", IsChecked = true };
+            var checkBoxShowRecords = new CheckBox { Content = "是否显示调频记录", IsChecked = true };
+            var checkBoxHideUID = new CheckBox { Content = "是否隐藏UID", IsChecked = true };
+
+            content.Children.Add(new TextBlock { Text = "通用设置", FontSize = 16, FontWeight = Microsoft.UI.Text.FontWeights.Bold });
+            content.Children.Add(checkBoxScreenShotSelf);
+            content.Children.Add(new StackPanel { Height = 1, Background = new SolidColorBrush(Colors.Gray) });
+
+            content.Children.Add(new TextBlock { Text = "截图设置", FontSize = 16, FontWeight = Microsoft.UI.Text.FontWeights.Bold });
+            content.Children.Add(checkBoxShowRecords);
+            content.Children.Add(checkBoxHideUID);
+
+            DialogManager.RaiseDialog(XamlRoot, "创建截图", content, true, "确认", () => CreateCapture_Run((bool)checkBoxShowRecords.IsChecked, (bool)checkBoxScreenShotSelf.IsChecked, (bool)checkBoxHideUID.IsChecked));
+        }
+
+        private async void CreateCapture_Run(bool isShowRecords, bool isScreenShotSelf, bool isHideUID)
+        {
+            WaitOverlayManager.RaiseWaitOverlay(true, "等待...", "");
+            var tcs = new TaskCompletionSource<bool>();
+
+            // 设置静态属性
+            ScreenShotGacha.isShowGachaRecords = isShowRecords;
+            ScreenShotGacha.isScreenShotSelf = isScreenShotSelf;
+            ScreenShotGacha.isHideUID = isHideUID;
+            var screenShotGacha = new ScreenShotGacha
+            {
+                TaskCompletionSource = tcs
+            };
+
+            var window = new Window
+            {
+                Content = screenShotGacha,
+                Title = selectedUid + "_ScreenShotGachaView"
+            };
+
+            screenShotGacha.CurrentWindow = window; // 设置窗口实例属性
+
+            IntPtr hWnd = WindowNative.GetWindowHandle(window);
+            WindowId windowId = Win32Interop.GetWindowIdFromWindow(hWnd);
+            AppWindow appWindow = AppWindow.GetFromWindowId(windowId);
+
+            var presenter = appWindow.Presenter as OverlappedPresenter;
+            if (presenter != null)
+            {
+                presenter.IsResizable = false;
+                presenter.IsMaximizable = false;
+            }
+
+            
+            if (isShowRecords)appWindow.Resize(new SizeInt32(904, 531));
+            else appWindow.Resize(new SizeInt32(520, 531));
+            window.Activate();
+            if (ScreenShotGacha.isScreenShotSelf) appWindow.Hide();
+
+            window.Closed += (s, args) =>
+            {
+                CreateCapture.IsEnabled = true;
+                WaitOverlayManager.RaiseWaitOverlay(false);
+                tcs.TrySetResult(ScreenShotGacha.isFinished);
+                // 重置静态属性
+                ScreenShotGacha.isFinished = false;
+                ScreenShotGacha.isShowGachaRecords = false;
+                ScreenShotGacha.isScreenShotSelf = false;
+            };
+
+            CreateCapture.IsEnabled = false;
+
+            bool isScreenShotFinished = await tcs.Task;
+
+            if (isScreenShotFinished)
+            {
+                WaitOverlayManager.RaiseWaitOverlay(false, "", "");
+                NotificationManager.RaiseNotification("截图完成", "截图已保存到\n" + SharedDatas.ScreenShotData.ScreenShotPath, InfoBarSeverity.Success, false, 3, () => CommonHelpers.FileHelpers.OpenFileLocation(SharedDatas.ScreenShotData.ScreenShotPath), "打开文件夹");
             }
         }
 
