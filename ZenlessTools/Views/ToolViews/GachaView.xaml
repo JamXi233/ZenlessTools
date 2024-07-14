@@ -22,6 +22,7 @@
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="导入记录"/>
                             <TextBlock Text="[CN]" FontWeight="Bold"/>
+                            <TextBlock Text="Beta" Foreground="Red" FontWeight="SemiBold"/>
                         </StackPanel>
                     </Button.Content>
                 </Button>
@@ -29,6 +30,7 @@
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="导出记录"/>
                         <TextBlock Text="[CN]" FontWeight="Bold"/>
+                        <TextBlock Text="Beta" Foreground="Red" FontWeight="SemiBold"/>
                     </StackPanel>
                 </Button>
                 <Button x:Name="ClearGacha" Content="清空记录" FontWeight="Bold" Foreground="Red" Click="ClearGacha_Click" IsEnabled="False" Margin="8 0 0 8"/>
