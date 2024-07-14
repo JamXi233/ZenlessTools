@@ -51,13 +51,13 @@ namespace ZenlessTools.Views.FirstRunViews
 
         private async void Restore_Data(object sender, RoutedEventArgs e)
         {
-            string filePath = await CommonHelpers.FileHelpers.OpenFile(".SRToolsBackup");
+            string filePath = await CommonHelpers.FileHelpers.OpenFile(".ZenlessToolsBackup");
 
             if (filePath != null)
             {
                 string userDocumentsFolderPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-                DeleteFolder(userDocumentsFolderPath + "\\JSG-LLC\\SRTools\\", "0");
-                Task.Run(() => ZipFile.ExtractToDirectory(filePath, userDocumentsFolderPath + "\\JSG-LLC\\SRTools\\")).Wait();
+                DeleteFolder(userDocumentsFolderPath + "\\JSG-LLC\\ZenlessTools\\", "0");
+                Task.Run(() => ZipFile.ExtractToDirectory(filePath, userDocumentsFolderPath + "\\JSG-LLC\\ZenlessTools\\")).Wait();
                 Frame parentFrame = GetParentFrame(this);
                 if (parentFrame != null)
                 {

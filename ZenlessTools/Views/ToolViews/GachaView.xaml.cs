@@ -395,7 +395,7 @@ namespace ZenlessTools.Views.ToolViews
 
         private async void ExportUIGF_Click(object sender, RoutedEventArgs e)
         {
-            string recordsBasePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), @"JSG-LLC\SRTools\GachaRecords");
+            string recordsBasePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), @"JSG-LLC\ZenlessTools\GachaRecords");
             DateTime now = DateTime.Now;
             string formattedDate = now.ToString("yyyy_MM_dd_HH_mm_ss");
 

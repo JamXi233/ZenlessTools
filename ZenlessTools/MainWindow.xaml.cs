@@ -462,7 +462,7 @@ namespace ZenlessTools
                     errorMessage = ex.Message.Trim() + "\n\n已生成错误报告\n如再次尝试仍会重现错误\n您可以到Github提交Issue";
                 }
 
-                ExpectionFileName = string.Format("ZenlessTools_Panic_{0:yyyyMMdd_HHmmss}.WaveToolsPanic", DateTime.Now);
+                ExpectionFileName = string.Format("ZenlessTools_Panic_{0:yyyyMMdd_HHmmss}.ZenlessToolsPanic", DateTime.Now);
 
                 // 显示InfoBar通知
                 AddNotification("严重错误", errorMessage, severity, true, 0, () =>

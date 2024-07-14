@@ -338,7 +338,7 @@ namespace ZenlessTools.Views
             var suggestFileName = "ZenlessTools_Backup_" + formattedDate;
             var fileTypeChoices = new Dictionary<string, List<string>>
             {
-                { "Zip Archive", new List<string> { ".json" } }
+                { "ZenlessTools Backup File", new List<string> { ".ZenlessToolsBackup" } }
             };
             var defaultExtension = ".ZenlessToolsBackup";
 
@@ -346,7 +346,7 @@ namespace ZenlessTools.Views
 
             if (filePath != null)
             {
-                string startPath = userDocumentsFolderPath + @"\JSG-LLC\SRTools";
+                string startPath = userDocumentsFolderPath + @"\JSG-LLC\ZenlessTools";
                 string zipPath = filePath;
                 if (File.Exists(zipPath))
                 {
@@ -372,7 +372,7 @@ namespace ZenlessTools.Views
             {
                 string userDocumentsFolderPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
                 Task.Run(() => Clear_AllData_NoClose(null, null)).Wait();
-                Task.Run(() => ZipFile.ExtractToDirectory(filePath, userDocumentsFolderPath + "\\JSG-LLC\\SRTools\\")).Wait();
+                Task.Run(() => ZipFile.ExtractToDirectory(filePath, userDocumentsFolderPath + "\\JSG-LLC\\ZenlessTools\\")).Wait();
                 await ProcessRun.RestartApp();
             }
             else WaitOverlayManager.RaiseWaitOverlay(false);
