@@ -307,6 +307,7 @@ namespace ZenlessTools.Views.GachaViews
                 var progressBar5 = CreateProgressBar(countSinceLast5Star, selectedCardPool.FiveStarPity.Value);
                 stackPanelFiveStar.Children.Add(progressBar5);
                 stackPanelFiveStar.Children.Add(new TextBlock { Text = $"保底{selectedCardPool.FiveStarPity.Value}发", FontSize = 12, Foreground = new SolidColorBrush(Colors.Gray) });
+                SharedDatas.Gacha.FiveStarPity = selectedCardPool.FiveStarPity.Value;
             }
             borderFiveStar.Child = stackPanelFiveStar;
             contentPanel.Children.Add(borderFiveStar);
@@ -402,7 +403,7 @@ namespace ZenlessTools.Views.GachaViews
             {
                 brush = new SolidColorBrush(Colors.Orange);
             }
-            else if (count >= 71 && count <= 80)
+            else if (count >= 71 && count <= 90)
             {
                 brush = new SolidColorBrush(Colors.Red);
             }
@@ -434,7 +435,7 @@ namespace ZenlessTools.Views.GachaViews
             {
                 brush = new SolidColorBrush(Colors.DarkOrange);
             }
-            else if (count >= 71 && count <= 80)
+            else if (count >= 71 && count <= 90)
             {
                 brush = new SolidColorBrush(Colors.DarkRed);
             }
@@ -460,8 +461,8 @@ namespace ZenlessTools.Views.GachaViews
             int count = int.Parse((string)value);
 
             // 定义最大宽度
-            double maxWidth = 290;
-            double width = (count / 80.0) * maxWidth;
+            double maxWidth = 294;
+            double width = (count / (double)SharedDatas.Gacha.FiveStarPity) * maxWidth;
             Logging.Write($"Converting count {count} to progress width {width}", 0);
             return Math.Min(width, maxWidth);
         }

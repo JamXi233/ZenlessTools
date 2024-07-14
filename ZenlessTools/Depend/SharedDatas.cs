@@ -8,18 +8,18 @@ namespace ZenlessTools.Depend
 {
     public static class SharedDatas
     {
-        public static class SharedData
+        public static class Gacha
         {
-            private static string _savedUsers = null;
-            public static string SavedUsers
+            private static double _fiveStarPity = 0;
+            public static double FiveStarPity
             {
                 get
                 {
-                    return _savedUsers;
+                    return _fiveStarPity;
                 }
                 set
                 {
-                    _savedUsers = value;
+                    _fiveStarPity = value;
                 }
             }
         }
