@@ -31,6 +31,7 @@ using Microsoft.UI.Xaml.Data;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
 using Newtonsoft.Json;
+using Windows.ApplicationModel;
 using Windows.Graphics.Imaging;
 using Windows.Storage.Streams;
 using ZenlessTools.Depend;
@@ -85,6 +86,9 @@ namespace ZenlessTools.Views.GachaViews
                 Console.WriteLine("找不到UID的调频记录文件");
                 return;
             }
+
+            app_name.Text = Package.Current.DisplayName;
+            app_version.Text = $"{Package.Current.Id.Version.Major}.{Package.Current.Id.Version.Minor}.{Package.Current.Id.Version.Build}.{Package.Current.Id.Version.Revision}";
 
             Logging.Write("Reading file content", 0);
             string jsonContent = await File.ReadAllTextAsync(filePath);

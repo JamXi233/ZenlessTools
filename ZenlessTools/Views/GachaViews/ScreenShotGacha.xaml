@@ -8,8 +8,19 @@
         <local:CountToProgressBackgroundColorConverter x:Key="CountToProgressBackgroundColorConverter" />
         <local:CountToProgressWidthConverter x:Key="CountToProgressWidthConverter" />
     </Page.Resources>
-    <Grid Background="White">
-        <Grid x:Name="TempGachaGrid" ColumnSpacing="8" Margin="8">
+    <Grid Background="{ThemeResource SystemControlAcrylicWindowMediumHighBrush}">
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="8">
+            <Border Width="32" Height="32" CornerRadius="4" Margin="0 0 8 0">
+                <Grid>
+                    <Image Source="ms-appx:///Imgs/Logo_Background.png" Stretch="UniformToFill" />
+                </Grid>
+            </Border>
+            <StackPanel Orientation="Vertical">
+                <TextBlock x:Name="app_name" Text="ZenlessTools" FontWeight="Bold"/>
+                <TextBlock x:Name="app_version" Text="1.0.0.0" FontWeight="SemiBold"/>
+            </StackPanel>
+        </StackPanel>
+        <Grid x:Name="TempGachaGrid" ColumnSpacing="8" Margin="8 56 8 8">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="10*"/>
                 <ColumnDefinition Width="12*"/>
@@ -116,7 +127,6 @@
 
         </Grid>
 
-        <TextBlock x:Name="version" HorizontalAlignment="Right" VerticalAlignment="Top" Text="ZenlessTools" Foreground="Gray"/>
-
+        <TextBlock x:Name="mark" HorizontalAlignment="Right" VerticalAlignment="Top" Text="ZenlessTools" Foreground="Gray"/>
     </Grid>
 </Page>

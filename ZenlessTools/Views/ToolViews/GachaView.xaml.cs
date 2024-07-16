@@ -52,6 +52,7 @@ using Microsoft.UI.Xaml.Media.Imaging;
 using Windows.Graphics.Imaging;
 using Windows.Storage.Streams;
 using Microsoft.UI.Windowing;
+using Vanara.PInvoke;
 
 
 namespace ZenlessTools.Views.ToolViews
@@ -669,9 +670,10 @@ namespace ZenlessTools.Views.ToolViews
                 presenter.IsMaximizable = false;
             }
 
-            
-            if (isShowRecords)appWindow.Resize(new SizeInt32(904, 531));
-            else appWindow.Resize(new SizeInt32(520, 531));
+            float scale = (float)User32.GetDpiForWindow(hWnd) / 96;
+
+            if (isShowRecords) appWindow.Resize(new SizeInt32((int)(904 * scale), (int)(580 * scale)));
+            else appWindow.Resize(new SizeInt32((int)(520 * scale), (int)(580 * scale)));
             window.Activate();
             if (ScreenShotGacha.isScreenShotSelf) appWindow.Hide();
 
