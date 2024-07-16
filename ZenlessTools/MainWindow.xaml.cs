@@ -454,7 +454,12 @@ namespace ZenlessTools
                 InfoBarSeverity severity = InfoBarSeverity.Error;
                 if (ex.Message.Contains("SSL"))
                 {
-                    errorMessage = "网络连接发生错误\n" + ex.Message;
+                    errorMessage = "网络连接发生错误";
+                    severity = InfoBarSeverity.Warning;
+                }
+                else if (ex.Message.Contains("process") && ex.Message.Contains("操作已被用户取消"))
+                {
+                    errorMessage = "未给予管理员权限\n操作已取消";
                     severity = InfoBarSeverity.Warning;
                 }
                 else
@@ -484,7 +489,7 @@ namespace ZenlessTools
             {
                 File.Create(filePath).Dispose();
             }
-            Process.Start("explorer.exe", folderPath);
+            CommonHelpers.FileHelpers.OpenFileLocation(filePath);
         }
 
         private DateTime lastNotificationTime = DateTime.MinValue;

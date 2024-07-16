@@ -1,7 +1,6 @@
 ﻿using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using System;
-using Windows.Storage.Pickers;
 using System.Diagnostics;
 using Microsoft.UI.Dispatching;
 using ZenlessTools.Depend;
@@ -14,6 +13,7 @@ using Windows.Foundation;
 using Microsoft.UI.Xaml.Navigation;
 using System.IO;
 using System.Runtime.InteropServices;
+using Microsoft.WindowsAPICodePack.Taskbar;
 
 namespace ZenlessTools.Views
 {
@@ -24,6 +24,7 @@ namespace ZenlessTools.Views
         private DispatcherQueueTimer dispatcherTimer_Game;
         public static string GS = null;
         public static bool isUserTap = true;
+        bool isGameUpdateRequire = false;
 
         [DllImport("User32.dll")]
         public static extern short GetAsyncKeyState(int vKey);
@@ -34,6 +35,8 @@ namespace ZenlessTools.Views
             Logging.Write("Switch to StartGameView", 0);
             this.Loaded += StartGameView_Loaded;
             this.Unloaded += OnUnloaded;
+            
+            GameUpdate.OnLoadData += LoadDataAsync;
 
             InitializeDispatcherQueue();
             InitializeTimers();
@@ -94,17 +97,8 @@ namespace ZenlessTools.Views
                     {
                         serverSelect.Visibility = Visibility.Visible;
                         await GameUpdate.ExtractGameInfo();
-                        bool isGameUpdateRequire = await GameUpdate.CheckAndUpdateGame();
-                        if (isGameUpdateRequire)
-                        {
-                            if (DownloadHelpers.isPaused) startUpdate.Visibility = Visibility.Visible;
-                            else updateRunning.Visibility = Visibility.Visible;
-                        }
-                        else
-                        {
-                            startGame.Visibility = Visibility.Visible;
-                            updateRunning.Visibility = Visibility.Collapsed;
-                        }
+                        isGameUpdateRequire = await GameUpdate.CheckAndUpdateGame();
+                        UpdateUI();
                         if (GameRegion == "Bili")
                         {
                             Frame_AccountView_Disable.Visibility = Visibility.Visible;
@@ -259,31 +253,57 @@ namespace ZenlessTools.Views
 
         private void MultiStartGame_Click(object sender, RoutedEventArgs e)
         {
-            DialogManager.RaiseDialog(this.XamlRoot, "游戏多开", "⚠️注意⚠️\n一次性只可以启动两个游戏\n否则会被检测到多开后强制关闭游戏", true, "启动游戏", StartGame, true, "关闭游戏", ProcessRun.StopSRProcess);
+            if (AppDataController.GetMultiLaunchMode() != 1) DialogManager.RaiseDialog(XamlRoot, "游戏多开", "⚠️注意⚠️\n实验性功能\n不确定是否会对账号产生影响\n使用本功能所导致的任何问题概不负责。", true, "开启功能", OpenMultiStartGameDialog);
+            else OpenMultiStartGameDialog();
+        }
+
+        private void OpenMultiStartGameDialog()
+        {
+            AppDataController.SetMultiLaunchMode(1);
+            var donationView = new MultiLaunchView();
+            DialogManager.RaiseDialog(XamlRoot, "游戏多开", donationView);
         }
 
         private async void StartUpdate_Click(object sender, RoutedEventArgs e)
         {
-            bool updateSuccessful = false;
-            if (DownloadHelpers.isDownloading)
+            if (!DownloadHelpers.isDownloading && !DownloadHelpers.isPaused)
             {
-                updateSuccessful = await GameUpdate.StartDownload(UpdateProgressChanged);
+                // 开始新的下载任务
+                await StartDownloadAndCheckStatus();
             }
             else if (DownloadHelpers.isPaused)
             {
+                // 恢复下载任务
                 GameUpdate.ResumeDownload(UpdateProgressChanged);
+                DownloadHelpers.isPaused = false;
+                UpdateUI();
             }
-            await CheckDownloadStatus();
         }
 
         private void PauseUpdate_Click(object sender, RoutedEventArgs e)
         {
-            GameUpdate.PauseDownload();
+            if (DownloadHelpers.isDownloading)
+            {
+                GameUpdate.PauseDownload();
+                DownloadHelpers.isPaused = true;
+                CommonHelpers.TaskbarHelper.SetProgressState(TaskbarProgressBarState.Paused);
+                UpdateUI();
+            }
+        }
+
+        private async Task StartDownloadAndCheckStatus()
+        {
+            UpdateUI();
+            bool updateSuccessful = await GameUpdate.StartDownload(UpdateProgressChanged);
+            if (updateSuccessful)
+            {
+                await LoadDataAsync(); // 下载和解压完成后加载数据
+            }
+            await CheckDownloadStatus();
         }
 
         private void UpdateProgressChanged(double progress, string speed, string size)
         {
-            CheckDownloadStatus();
             DispatcherQueue.TryEnqueue(() =>
             {
                 downloadProgressBar.Value = progress;
@@ -297,26 +317,47 @@ namespace ZenlessTools.Views
         {
             while (DownloadHelpers.isDownloading)
             {
-                if (!DownloadHelpers.isPaused)
+                UpdateUI();
+                await Task.Delay(100);
+            }
+
+            // 下载结束后的处理
+            DownloadHelpers.DownloadProgressChanged -= UpdateProgressChanged;
+            startUpdate.Visibility = Visibility.Collapsed;
+            updateRunning.Visibility = Visibility.Collapsed;
+            startGame.Visibility = Visibility.Visible;
+            await LoadDataAsync(); // 确保异步方法被正确等待
+        }
+
+        private void UpdateUI()
+        {
+            if (isGameUpdateRequire)
+            {
+                startGame_Panel.Visibility = Visibility.Collapsed;
+                if (DownloadHelpers.isDownloading)
                 {
-                    startUpdate.Visibility = Visibility.Collapsed;
-                    updateRunning.Visibility = Visibility.Visible;
+                    if (DownloadHelpers.isPaused)
+                    {
+                        startUpdate.Visibility = Visibility.Visible;
+                        updateRunning.Visibility = Visibility.Collapsed;
+                    }
+                    else
+                    {
+                        startUpdate.Visibility = Visibility.Collapsed;
+                        updateRunning.Visibility = Visibility.Visible;
+                    }
                 }
                 else
                 {
                     startUpdate.Visibility = Visibility.Visible;
                     updateRunning.Visibility = Visibility.Collapsed;
                 }
-                await Task.Delay(100);
             }
-
-            if (!DownloadHelpers.isDownloading)
+            else
             {
-                DownloadHelpers.DownloadProgressChanged -= UpdateProgressChanged;
                 startUpdate.Visibility = Visibility.Collapsed;
                 updateRunning.Visibility = Visibility.Collapsed;
-                startGame.Visibility = Visibility.Visible;
-                LoadDataAsync();
+                startGame_Panel.Visibility = Visibility.Visible;
             }
         }
 
@@ -329,6 +370,7 @@ namespace ZenlessTools.Views
                 rmGame.Visibility = Visibility.Collapsed;
                 rmGame.IsEnabled = false;
                 startGame.IsEnabled = false;
+                multiStartGame.IsEnabled = false;
                 SGFrame.Visibility = Visibility.Collapsed;
             }
             else
@@ -338,6 +380,7 @@ namespace ZenlessTools.Views
                 rmGame.Visibility = Visibility.Visible;
                 rmGame.IsEnabled = true;
                 startGame.IsEnabled = true;
+                multiStartGame.IsEnabled = true;
                 SGFrame.Visibility = Visibility.Visible;
             }
         }
