@@ -203,7 +203,7 @@
                                 
                             </StackPanel>
 
-                            <StackPanel VerticalAlignment="Bottom" HorizontalAlignment="Right">
+                            <StackPanel VerticalAlignment="Bottom" HorizontalAlignment="Right"  Visibility="Collapsed">
 
                                 <Button x:Name="multiStartGame" Content="游戏多开" FontSize="12" Width="90" Click="MultiStartGame_Click"/>
 
