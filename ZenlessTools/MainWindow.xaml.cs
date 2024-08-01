@@ -32,9 +32,6 @@ using ZenlessTools.Depend;
 using System.Threading.Tasks;
 using System.IO;
 using System.Net.Http;
-using System.Text.Json;
-using Microsoft.UI.Xaml.Media.Imaging;
-using Windows.System;
 using ZenlessTools.Views.FirstRunViews;
 using static ZenlessTools.App;
 using System.Diagnostics;
@@ -52,8 +49,8 @@ namespace ZenlessTools
         private AppWindow appWindow = null;
         private AppWindowTitleBar titleBar;
         string ExpectionFileName;
-        string backgroundUrl = "";
 
+        public ImageBrush BackgroundBrush => Background;
 
         private const int GWL_STYLE = -16;
         private const int WS_MAXIMIZEBOX = 0x00010000;
@@ -131,7 +128,6 @@ namespace ZenlessTools
             // 确保初始化代码只执行一次
             this.Activated -= MainWindow_Activated;
             await InitializeAppDataAsync();
-            await BackgroundImageAsync();
             InitStatus();
             CleanUpdate();
             if (AppDataController.GetAutoCheckUpdate() == 1)
@@ -368,33 +364,6 @@ namespace ZenlessTools
             // Remove the WS_SIZEBOX style to disable resizing
             style &= ~NativeMethods.WS_SIZEBOX;
             NativeMethods.SetWindowLong(hwnd, NativeMethods.GWL_STYLE, style);
-        }
-
-        private async Task BackgroundImageAsync()
-        {
-            string apiUrl = "https://hyp-api.mihoyo.com/hyp/hyp-connect/api/getGames?launcher_id=jGHBHlcOq1&language=zh-cn";
-            string responseBody = await FetchData(apiUrl);
-            using (JsonDocument doc = JsonDocument.Parse(responseBody))
-            {
-                JsonElement root = doc.RootElement;
-                JsonElement games = root.GetProperty("data").GetProperty("games");
-
-                foreach (JsonElement game in games.EnumerateArray())
-                {
-                    if (game.GetProperty("biz").GetString() == "nap_cn")
-                    {
-                        backgroundUrl = game.GetProperty("display").GetProperty("background").GetProperty("url").GetString();
-                        break;
-                    }
-                }
-            }
-
-            if (!string.IsNullOrEmpty(backgroundUrl))
-            {
-                BitmapImage backgroundImage = new BitmapImage();
-                backgroundImage.UriSource = new Uri(backgroundUrl);
-                Background.ImageSource = backgroundImage;
-            }
         }
 
         private void InitStatus()

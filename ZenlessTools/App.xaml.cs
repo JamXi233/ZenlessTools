@@ -24,6 +24,7 @@ using ZenlessTools.Depend;
 using System;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Windows.Storage;
 
@@ -32,6 +33,9 @@ namespace ZenlessTools
 {
     public partial class App : Application
     {
+        private const string MutexName = "ZenlessToolsSingletonMutex";
+        private static Mutex _mutex;
+
         public static MainWindow MainWindow { get; private set; }
         public static ApplicationTheme CurrentTheme { get; private set; }
         public static bool SDebugMode { get; set; }
@@ -44,6 +48,18 @@ namespace ZenlessTools
         // 导入 GetAsyncKeyState 函数
         [DllImport("User32.dll")]
         public static extern short GetAsyncKeyState(int vKey);
+
+        [DllImport("user32.dll")]
+        private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        private static extern bool IsIconic(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+        private const int SW_RESTORE = 9;
+
         internal Window m_window;
         public static bool IsRequireReboot { get; set; } = false;
         public static bool IsZenlessToolsRequireUpdate { get; set; } = false;
@@ -51,19 +67,49 @@ namespace ZenlessTools
 
         public App()
         {
-            InitializeComponent();
-            Init();
-            InitAppData();
-            SetupTheme();
-            InitAdminMode();
+            bool createdNew;
+            _mutex = new Mutex(true, MutexName, out createdNew);
+            if (!createdNew)
+            {
+                BringExistingInstanceToForeground();
+                Environment.Exit(1);
+            }
+            else
+            {
+                InitializeComponent();
+                Init();
+                InitAppData();
+                SetupTheme();
+                InitAdminMode();
+            }
+
         }
+
+        private void BringExistingInstanceToForeground()
+        {
+            var currentProcess = System.Diagnostics.Process.GetCurrentProcess();
+            foreach (var process in System.Diagnostics.Process.GetProcessesByName(currentProcess.ProcessName))
+            {
+                if (process.Id != currentProcess.Id)
+                {
+                    IntPtr hWnd = process.MainWindowHandle;
+                    if (IsIconic(hWnd))
+                    {
+                        ShowWindow(hWnd, SW_RESTORE);
+                    }
+                    SetForegroundWindow(hWnd);
+                    break;
+                }
+            }
+        }
+
 
         protected override async void OnLaunched(LaunchActivatedEventArgs args)
         {
             if (AppDataController.GetTerminalMode() == -1 || AppDataController.GetTerminalMode() == 0)
             {
-                m_window = new MainWindow();
-                m_window.Activate();
+                MainWindow = new MainWindow();
+                MainWindow.Activate();
             }
             else await InitTerminalModeAsync(AppDataController.GetTerminalMode());
         }

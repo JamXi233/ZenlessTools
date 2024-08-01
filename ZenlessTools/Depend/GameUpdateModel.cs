@@ -1,4 +1,24 @@
-﻿using System;
+﻿// Copyright (c) 2021-2024, JamXi JSG-LLC.
+// All rights reserved.
+
+// This file is part of ZenlessTools.
+
+// ZenlessTools is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+
+// ZenlessTools is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+
+// You should have received a copy of the GNU General Public License
+// along with ZenlessTools.  If not, see <http://www.gnu.org/licenses/>.
+
+// For more information, please refer to <https://www.gnu.org/licenses/gpl-3.0.html>
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -15,6 +35,7 @@ namespace ZenlessTools.Depend
         public static string LatestVoicePacksPath { get; set; }
         public static string LatestVoicePacksSize { get; set; }
         public static string LatestVoicePacksMD5 { get; set; }
+        public static string DiffsVersion { get; set; }
         public static string DiffsPath { get; set; }
         public static string DiffsSize { get; set; }
         public static string DiffsMD5 { get; set; }

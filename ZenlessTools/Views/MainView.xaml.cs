@@ -30,11 +30,8 @@ using System.Threading.Tasks;
 using System.Net.Http;
 using System.Text.Json;
 using System.Collections.ObjectModel;
-using Microsoft.UI.Xaml.Input;
 using ZenlessTools.Views.NotifyViews;
 using System.IO;
-using static ZenlessTools.App;
-using System.Runtime.InteropServices;
 
 namespace ZenlessTools.Views
 {
@@ -44,6 +41,7 @@ namespace ZenlessTools.Views
         public ObservableCollection<string> Pictures { get; } = new ObservableCollection<string>();
         public ObservableCollection<string> PicturesClick { get; } = new ObservableCollection<string>();
         static Dictionary<string, BitmapImage> imageCache = new Dictionary<string, BitmapImage>();
+        static Dictionary<string, string> imageLinks = new Dictionary<string, string>();
 
         private string _url;
         string backgroundUrl = "";
@@ -62,8 +60,9 @@ namespace ZenlessTools.Views
 
         private async void MainView_Loaded(object sender, RoutedEventArgs e)
         {
-            await LoadPicturesAsync();
-            await LoadPostAsync();
+            await LoadImageLinksAsync();
+            await CompareAndUpdateImageLinks();
+            LoadPostAsync();
 
             try
             {
@@ -77,33 +76,10 @@ namespace ZenlessTools.Views
             }
         }
 
-        private async Task LoadPicturesAsync()
-        {
-            await LoadGameBackgroundAsync();
-            await LoadAdvertisementDataAsync();
-        }
-
         private async Task LoadGameBackgroundAsync()
         {
-            string apiUrl = "https://hyp-api.mihoyo.com/hyp/hyp-connect/api/getGames?launcher_id=jGHBHlcOq1&language=zh-cn";
-            string responseBody = await FetchData(apiUrl);
-            using (JsonDocument doc = JsonDocument.Parse(responseBody))
-            {
-                JsonElement root = doc.RootElement;
-                JsonElement games = root.GetProperty("data").GetProperty("games");
-
-                foreach (JsonElement game in games.EnumerateArray())
-                {
-                    if (game.GetProperty("biz").GetString() == "nap_cn")
-                    {
-                        backgroundUrl = game.GetProperty("display").GetProperty("background").GetProperty("url").GetString();
-                        break;
-                    }
-                }
-            }
-
-            apiUrl = "https://hyp-api.mihoyo.com/hyp/hyp-connect/api/getAllGameBasicInfo?launcher_id=jGHBHlcOq1&language=zh-cn&game_id=x6znKlJ0xK";
-            responseBody = await FetchData(apiUrl);
+            var apiUrl = "https://hyp-api.mihoyo.com/hyp/hyp-connect/api/getAllGameBasicInfo?launcher_id=jGHBHlcOq1&language=zh-cn&game_id=x6znKlJ0xK";
+            var responseBody = await FetchData(apiUrl);
             using (JsonDocument doc = JsonDocument.Parse(responseBody))
             {
                 JsonElement root = doc.RootElement;
@@ -124,7 +100,7 @@ namespace ZenlessTools.Views
             }
         }
 
-        private async Task LoadPostAsync()
+        private async void LoadPostAsync()
         {
             await getNotify.Get();
             NotifyLoad.Visibility = Visibility.Collapsed;
@@ -140,7 +116,7 @@ namespace ZenlessTools.Views
             }
         }
 
-        private async Task LoadAdvertisementDataAsync()
+        private async void LoadAdvertisementDataAsync()
         {
             Logging.Write("LoadAdvertisementData...", 0);
 
@@ -150,52 +126,11 @@ namespace ZenlessTools.Views
                 Directory.CreateDirectory(imageFolderPath);
             }
 
-            Logging.Write("Getting Background: " + backgroundUrl, 0);
-
-            try
-            {
-                bool isBackgroundUpdated = await IsImageLinkUpdatedAsync("background", backgroundUrl);
-                if (!isBackgroundUpdated)
-                {
-                    BackgroundImage.Source = await LoadImageAsync(backgroundUrl, "background.jpg");
-                    Logging.Write("Background image loaded from local file", 0);
-                }
-                else
-                {
-                    BackgroundImage.Source = await LoadImageAsync(backgroundUrl, "background.jpg");
-                    Logging.Write("Background image updated and loaded successfully", 0);
-                }
-            }
-            catch (Exception ex)
-            {
-                Logging.Write($"Error loading background image: {ex.Message}", 2);
-            }
-
-            try
-            {
-                Logging.Write("Getting Button Image: " + iconUrl, 0);
-                bool isIconUpdated = await IsImageLinkUpdatedAsync("icon", iconUrl);
-                if (!isIconUpdated)
-                {
-                    IconImageBrush.ImageSource = await LoadImageAsync(iconUrl, "icon.jpg");
-                    Logging.Write("Button image loaded from local file", 0);
-                }
-                else
-                {
-                    IconImageBrush.ImageSource = await LoadImageAsync(iconUrl, "icon.jpg");
-                    Logging.Write("Button image updated and loaded successfully", 0);
-                }
-            }
-            catch (Exception e)
-            {
-                Logging.Write("Getting Button Image Error: " + e.Message, 0);
-            }
+            await LoadImageAsync("background", backgroundUrl, "background.webp");
+            await LoadImageAsync("icon", iconUrl, "icon.png");
 
             loadRing.Visibility = Visibility.Collapsed;
         }
-
-
-        
 
         private async Task<string> FetchData(string url)
         {
@@ -253,97 +188,163 @@ namespace ZenlessTools.Views
             }
         }
 
-        private async Task<BitmapImage> LoadImageAsync(string imageUrl, string fileName)
+        private async Task LoadImageAsync(string imageType, string imageUrl, string fileName)
         {
+            if (string.IsNullOrEmpty(imageUrl))
+            {
+                Logging.Write($"{imageType} URL is empty.", 2);
+                return;
+            }
+
             string filePath = Path.Combine(imageFolderPath, fileName);
             BitmapImage bitmapImage = new BitmapImage();
 
-            // 尝试加载本地文件
-            try
+            if (imageCache.ContainsKey(imageUrl))
             {
-                if (File.Exists(filePath))
+                bitmapImage = imageCache[imageUrl];
+            }
+            else
+            {
+                // 尝试加载本地文件
+                try
                 {
-                    using (var stream = File.OpenRead(filePath))
+                    if (File.Exists(filePath))
                     {
-                        await bitmapImage.SetSourceAsync(stream.AsRandomAccessStream());
-                        imageCache[imageUrl] = bitmapImage;
-                        return bitmapImage;
+                        using (var stream = File.OpenRead(filePath))
+                        {
+                            await bitmapImage.SetSourceAsync(stream.AsRandomAccessStream());
+                            imageCache[imageUrl] = bitmapImage;
+                            UpdateImageSource(imageType, bitmapImage);
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        Logging.Write($"Local file not found: {filePath}", 2);
                     }
                 }
-                else
+                catch (Exception ex)
                 {
-                    Logging.Write($"Local file not found: {filePath}", 2);
+                    Logging.Write($"Error loading local image from {filePath}: {ex.Message}", 2);
+                }
+
+                // 本地文件加载失败或不存在，尝试下载并保存图片
+                try
+                {
+                    byte[] imageData = await httpClient.GetByteArrayAsync(imageUrl);
+                    await File.WriteAllBytesAsync(filePath, imageData);
+
+                    using (var memStream = new MemoryStream(imageData))
+                    {
+                        memStream.Position = 0;
+                        await bitmapImage.SetSourceAsync(memStream.AsRandomAccessStream());
+                    }
+
+                    imageCache[imageUrl] = bitmapImage;
+                }
+                catch (Exception ex)
+                {
+                    Logging.Write($"Error downloading image from {imageUrl}: {ex.Message}", 2);
                 }
             }
-            catch (Exception ex)
+
+            UpdateImageSource(imageType, bitmapImage);
+        }
+
+        private void UpdateImageSource(string imageType, BitmapImage bitmapImage)
+        {
+            if (imageType == "background")
             {
-                Logging.Write($"Error loading local image from {filePath}: {ex.Message}", 2);
+                var mainWindow = (MainWindow)App.MainWindow;
+                mainWindow.BackgroundBrush.ImageSource = bitmapImage;
+                BackgroundImage.Source = bitmapImage;
+            }
+            else if (imageType == "icon")
+            {
+                IconImageBrush.ImageSource = bitmapImage;
             }
 
-            // 本地文件加载失败或不存在，尝试下载并保存图片
+            Logging.Write($"{imageType} image loaded successfully", 0);
+        }
+
+        private async Task LoadImageLinksAsync()
+        {
+            if (File.Exists(imageLinksFilePath))
+            {
+                try
+                {
+                    string json = await File.ReadAllTextAsync(imageLinksFilePath);
+                    imageLinks = JsonSerializer.Deserialize<Dictionary<string, string>>(json);
+                    imageLinks.TryGetValue("background", out backgroundUrl);
+                    imageLinks.TryGetValue("icon", out iconUrl);
+                }
+                catch (Exception ex)
+                {
+                    Logging.Write($"Error loading image links from JSON: {ex.Message}", 2);
+                }
+            }
+        }
+
+        private void SaveImageLinks()
+        {
             try
             {
-                byte[] imageData = await httpClient.GetByteArrayAsync(imageUrl);
-                await File.WriteAllBytesAsync(filePath, imageData);
-
-                using (var memStream = new MemoryStream(imageData))
-                {
-                    memStream.Position = 0;
-                    await bitmapImage.SetSourceAsync(memStream.AsRandomAccessStream());
-                }
-
-                SaveImageLink(fileName, imageUrl);
-                imageCache[imageUrl] = bitmapImage;
+                string json = JsonSerializer.Serialize(imageLinks);
+                File.WriteAllText(imageLinksFilePath, json);
             }
             catch (Exception ex)
             {
-                Logging.Write($"Error downloading image from {imageUrl}: {ex.Message}", 2);
+                Logging.Write($"Error saving image links to JSON: {ex.Message}", 2);
             }
-
-            return bitmapImage;
         }
 
-
-
-
-
-        private async Task<bool> IsImageLinkUpdatedAsync(string imageType, string newUrl)
+        private async Task CompareAndUpdateImageLinks()
         {
-            Dictionary<string, string> imageLinks = new Dictionary<string, string>();
-
-            if (File.Exists(imageLinksFilePath))
+            var apiUrl = "https://hyp-api.mihoyo.com/hyp/hyp-connect/api/getAllGameBasicInfo?launcher_id=jGHBHlcOq1&language=zh-cn&game_id=x6znKlJ0xK";
+            var responseBody = await FetchData(apiUrl);
+            using (JsonDocument doc = JsonDocument.Parse(responseBody))
             {
-                string json = await File.ReadAllTextAsync(imageLinksFilePath);
-                imageLinks = JsonSerializer.Deserialize<Dictionary<string, string>>(json);
+                JsonElement root = doc.RootElement;
+                JsonElement gameInfoList = root.GetProperty("data").GetProperty("game_info_list");
+
+                foreach (JsonElement gameInfo in gameInfoList.EnumerateArray())
+                {
+                    JsonElement game = gameInfo.GetProperty("game");
+                    if (game.GetProperty("biz").GetString() == "nap_cn")
+                    {
+                        JsonElement backgrounds = gameInfo.GetProperty("backgrounds")[0];
+                        string newBackgroundUrl = backgrounds.GetProperty("background").GetProperty("url").GetString();
+                        string newIconUrl = backgrounds.GetProperty("icon").GetProperty("url").GetString();
+
+                        bool isBackgroundUpdated = imageLinks.ContainsKey("background") && imageLinks["background"] != newBackgroundUrl;
+                        bool isIconUpdated = imageLinks.ContainsKey("icon") && imageLinks["icon"] != newIconUrl;
+
+                        if (isBackgroundUpdated || isIconUpdated)
+                        {
+                            imageCache.Clear();
+                            DeleteLocalImage("background.webp");
+                            DeleteLocalImage("icon.png");
+                        }
+
+                        backgroundUrl = newBackgroundUrl;
+                        iconUrl = newIconUrl;
+                        imageLinks["background"] = backgroundUrl;
+                        imageLinks["icon"] = iconUrl;
+                        SaveImageLinks();
+                        LoadAdvertisementDataAsync();
+                        break;
+                    }
+                }
             }
-
-            if (imageLinks.ContainsKey(imageType) && imageLinks[imageType] == newUrl)
-            {
-                return false;
-            }
-
-            imageLinks[imageType] = newUrl;
-            string updatedJson = JsonSerializer.Serialize(imageLinks);
-            await File.WriteAllTextAsync(imageLinksFilePath, updatedJson);
-
-            return true;
         }
 
-
-
-        private void SaveImageLink(string imageType, string newUrl)
+        private void DeleteLocalImage(string fileName)
         {
-            Dictionary<string, string> imageLinks = new Dictionary<string, string>();
-
-            if (File.Exists(imageLinksFilePath))
+            string filePath = Path.Combine(imageFolderPath, fileName);
+            if (File.Exists(filePath))
             {
-                string json = File.ReadAllText(imageLinksFilePath);
-                imageLinks = JsonSerializer.Deserialize<Dictionary<string, string>>(json);
+                File.Delete(filePath);
             }
-
-            imageLinks[imageType] = newUrl;
-            string updatedJson = JsonSerializer.Serialize(imageLinks);
-            File.WriteAllText(imageLinksFilePath, updatedJson);
         }
     }
 }
