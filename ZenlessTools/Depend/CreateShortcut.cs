@@ -20,6 +20,7 @@
 
 using System;
 using System.IO;
+using static ZenlessTools.App;
 
 namespace ZenlessTools.Depend
 {
@@ -27,12 +28,13 @@ namespace ZenlessTools.Depend
     {
         public static async void CreateDesktopShortcut()
         {
-            string shortcutPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "ZenlessTools(绝区零工具箱).url");
+            string shortcutPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "绝区零工具箱.url");
             using (StreamWriter writer = new StreamWriter(shortcutPath))
             {
                 writer.WriteLine("[InternetShortcut]");
                 writer.WriteLine("URL=ZenlessTools:///");
             }
+            NotificationManager.RaiseNotification("创建桌面快捷方式", "绝区零工具箱桌面快捷方式已创建。", Microsoft.UI.Xaml.Controls.InfoBarSeverity.Success, true, 2);
         }
     }
 }
